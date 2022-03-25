@@ -1023,7 +1023,7 @@ function QKfinish_load_body(){
 				
 				var startQuery = function(){
 					$.ajax({ 
-						url: location_org.replace(header_info[0].host, parent.staticIP) + "/httpd_check.json",
+						url: location_org.replace(header_info[0].host, parent.staticIP) + "/repage.json",
 						dataType: 'jsonp',
 						timeout: 2000,
 
@@ -1042,7 +1042,7 @@ function QKfinish_load_body(){
 			}
 			else{
 				$("#lanip")[0].innerHTML = "<#BOP_ctype_title1#>";
-				document.getElementById("applyBtn").innerHTML = "<div style='text-align:left;margin-left:75px;'><br/><br/><#LANConfig_ChangedLANIP#></div>";
+				document.getElementById("applyBtn").innerHTML = "<div style='text-align:left;margin-left:75px;'><br/><br/><#deviceDiscorvy3#></div>";
 			}
 		}
 	}
@@ -1099,7 +1099,7 @@ function check_fimware(){
 	}	
 }
 
-function iAmAlive(){
+function repage(){
 	top.location.href = "http://" + parent.staticIP;					
 }
 

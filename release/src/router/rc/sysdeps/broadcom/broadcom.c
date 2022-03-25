@@ -261,6 +261,7 @@ GetPhyStatus(int verbose)
 		break;
 	case MODEL_RTN16:
 	case MODEL_RTN10U:
+	case MODEL_RTAC3200:
 		/* WAN L1 L2 L3 L4 */
 		ports[0]=0; ports[1]=4; ports[2]=3, ports[3]=2; ports[4]=1;
 		break;
@@ -286,7 +287,6 @@ GetPhyStatus(int verbose)
 	case MODEL_DSLAC68U:
 	case MODEL_RPAC68U:
 	case MODEL_RTAC68U:
-	case MODEL_RTAC3200:
 	case MODEL_RTN18U:
 	case MODEL_RTAC53U:
 	case MODEL_RTN66U:
@@ -506,12 +506,16 @@ setAllLedOn(void)
 #endif
 #ifdef RT4GAC68U
 			led_control(LED_LAN, LED_ON);
+			led_control(LED_WPS, LED_ON);
+#endif
+#ifdef RTCONFIG_INTERNAL_GOBI
+#ifdef RT4GAC68U
 			led_control(LED_3G, LED_ON);
+#endif
 			led_control(LED_LTE, LED_ON);
 			led_control(LED_SIG1, LED_ON);
 			led_control(LED_SIG2, LED_ON);
 			led_control(LED_SIG3, LED_ON);
-			led_control(LED_SIG4, LED_ON);
 #endif
 			eval("et", "-i", "eth0", "robowr", "0", "0x18", "0x01ff");	// lan/wan ethernet/giga led
 			eval("et", "-i", "eth0", "robowr", "0", "0x1a", "0x01e0");
@@ -542,8 +546,7 @@ setAllLedOn(void)
 #ifdef RTAC68U
 			 /* 4360's fake 5g led */
 			led_control(LED_5G, LED_ON);
-			if (!strcmp(get_productid(), MODEL_STR_RTAC66UV2)
-				|| !strcmp(get_productid(), MODEL_STR_RTAC66UV2_ODM1))
+			if (is_ac66u_v2_series())
 			led_control(LED_WAN, LED_ON);
 #endif
 			break;
@@ -671,6 +674,22 @@ setAllLedOn(void)
 			break;
 		}
 	}
+
+	puts("1");
+	return 0;
+}
+
+int setAllOrangeLedOn(void) {
+	int model = get_model();
+	switch (model) {
+		case MODEL_RTAC68U:
+#ifdef RTCONFIG_INTERNAL_GOBI
+#ifdef RT4GAC68U
+			led_control(LED_3G, LED_ON);
+#endif
+#endif
+			break;
+	};
 
 	puts("1");
 	return 0;
@@ -860,12 +879,16 @@ setAllLedOff(void)
 #endif
 #ifdef RT4GAC68U
 			led_control(LED_LAN, LED_OFF);
+			led_control(LED_WPS, LED_OFF);
+#endif
+#ifdef RTCONFIG_INTERNAL_GOBI
+#ifdef RT4GAC68U
 			led_control(LED_3G, LED_OFF);
+#endif
 			led_control(LED_LTE, LED_OFF);
 			led_control(LED_SIG1, LED_OFF);
 			led_control(LED_SIG2, LED_OFF);
 			led_control(LED_SIG3, LED_OFF);
-			led_control(LED_SIG4, LED_OFF);
 #endif
 			eval("et", "-i", "eth0", "robowr", "0", "0x18", "0x01e0");	// lan/wan ethernet/giga led
 			eval("et", "-i", "eth0", "robowr", "0", "0x1a", "0x01e0");
@@ -896,8 +919,7 @@ setAllLedOff(void)
 #ifdef RTAC68U
 			/* 4360's fake 5g led */
 			led_control(LED_5G, LED_OFF);
-			if (!strcmp(get_productid(), MODEL_STR_RTAC66UV2)
-				|| !strcmp(get_productid(), MODEL_STR_RTAC66UV2_ODM1))
+			if (is_ac66u_v2_series())
 			led_control(LED_WAN, LED_OFF);
 #endif
 #ifdef RTCONFIG_FAKE_ETLAN_LED
@@ -1192,8 +1214,7 @@ setWanLedMode1(void)
 		case MODEL_RTAC88U:
 		case MODEL_RTAC3100:
 #ifdef RTAC68U
-			if (strcmp(get_productid(), MODEL_STR_RTAC66UV2)
-				&& strcmp(get_productid(), MODEL_STR_RTAC66UV2_ODM1))
+			if (!is_ac66u_v2_series())
 				goto exit;
 #endif
 			eval("et", "-i", "eth0", "robowr", "0", "0x18", "0x01e0");	// lan/wan ethernet/giga led
@@ -1222,8 +1243,7 @@ setWanLedMode2(void)
 		case MODEL_RTAC88U:
 		case MODEL_RTAC3100:
 #ifdef RTAC68U
-			if (strcmp(get_productid(), MODEL_STR_RTAC66UV2)
-				&& strcmp(get_productid(), MODEL_STR_RTAC66UV2_ODM1))
+			if (!is_ac66u_v2_series())
 				goto exit;
 #endif
 			eval("et", "-i", "eth0", "robowr", "0", "0x18", "0x0101");	// lan/wan ethernet/giga led
@@ -3208,7 +3228,7 @@ wl_check_chanspec()
 {
 	wl_uint32_list_t *list;
 	chanspec_t c, chansp_40m;
-	int ret = 0, i, count;
+	int ret = 0, i;
 	char data_buf[WLC_IOCTL_MAXLEN];
 	char chanbuf[CHANSPEC_STR_LEN];
 	char word[256], *next;
@@ -3217,6 +3237,7 @@ wl_check_chanspec()
 	int match;
 	int match_ctrl_ch;
 	int match_40m_ch;
+	unsigned int count;
 
 	foreach (word, nvram_safe_get("wl_ifnames"), next) {
 		snprintf(prefix, sizeof(prefix), "wl%d_", unit++);
@@ -3242,6 +3263,9 @@ wl_check_chanspec()
 
 		if (!count) {
 			dbg("number of valid chanspec is 0\n");
+			continue;
+		} else if (count > (data_buf + sizeof(data_buf) - (char *)&list->element[0])/sizeof(list->element[0])) {
+			dbg("number of valid chanspec %d is invalid\n", count);
 			continue;
 		} else
 		for (i = 0; i < count; i++) {
@@ -3292,19 +3316,21 @@ wl_check_5g_band_group()
 {
 	wl_uint32_list_t *list;
 	chanspec_t c;
-	int ret = 0, i, count;
+	int ret = 0, i;
 	char data_buf[WLC_IOCTL_MAXLEN];
 	char word[256], *next;
 	char tmp[100], tmp2[100], prefix[] = "wlXXXXXXXXXX_";
 	int unit = 0;
-	unsigned int band5grp;
+	unsigned int count, band5grp;
 
 	foreach (word, nvram_safe_get("wl_ifnames"), next) {
 		snprintf(prefix, sizeof(prefix), "wl%d_", unit++);
 		c = 0;
 
 		if (unit == 1) continue;
-
+#if defined(RTCONFIG_BCM_7114) || defined(HND_ROUTER)
+		if(nvram_get_int(strcat_r(prefix, "failed", tmp)) >= 3) continue;
+#endif
 		memset(data_buf, 0, WLC_IOCTL_MAXLEN);
 		ret = wl_iovar_getbuf(word, "chanspecs", &c, sizeof(chanspec_t),
 			data_buf, WLC_IOCTL_MAXLEN);
@@ -3318,6 +3344,9 @@ wl_check_5g_band_group()
 
 		if (!count) {
 			dbg("number of valid chanspec is 0\n");
+			continue;
+		} else if (count > (data_buf + sizeof(data_buf) - (char *)&list->element[0])/sizeof(list->element[0])) {
+			dbg("number of valid chanspec %d is invalid\n", count);
 			continue;
 		} else
 			for (i = 0, band5grp = 0; i < count; i++) {
@@ -3689,13 +3718,14 @@ void wlconf_pre()
 #ifdef RTCONFIG_QTN
 		if (!strcmp(word, "wifi0")) break;
 #endif
-		if ((nvram_match(strcat_r(prefix, "nband", tmp), "1") &&
+		if (hw_vht_cap() &&
+		   ((nvram_match(strcat_r(prefix, "nband", tmp), "1") &&
 		     nvram_match(strcat_r(prefix, "vreqd", tmp), "1"))
 #if !defined(RTCONFIG_BCM9) && !defined(RTAC56U) && !defined(RTAC56S)
 		 || (nvram_match(strcat_r(prefix, "nband", tmp), "2") &&
 		     nvram_get_int(strcat_r(prefix, "turbo_qam", tmp)))
 #endif
-		) {
+		)) {
 #ifdef RTCONFIG_BCMARM
 #if !defined(RTCONFIG_BCM9) && !defined(RTAC56U) && !defined(RTAC56S)
 			if (nvram_match(strcat_r(prefix, "nband", tmp), "2"))
@@ -3758,8 +3788,7 @@ void wlconf_post(const char *ifname)
 #endif
 
 #ifdef RTAC68U
-	if (!strcmp(get_productid(), MODEL_STR_RTAC66UV2)
-		|| !strcmp(get_productid(), MODEL_STR_RTAC66UV2_ODM1)) {
+	if (is_ac66u_v2_series()) {
 		if (unit) eval("wl", "-i", (char *) ifname, "radioreg", "0x892", "0x4068");
 		eval("wl", "-i", (char *) ifname, "aspm", "3");
 	}
@@ -4192,40 +4221,3 @@ void led_bh_prep(int post)
 	}
 }
 #endif
-
-#if !defined(RTAC66U) && !defined(RTN66U) && !defined(RTAC68U)
-int
-getWiFiStatus(const char *ifc)
-{
-	FILE *fp;
-	char buf[128], *line;
-	int ret = 1;
-
-	if (!strcmp(ifc, "2G"))
-		sprintf(buf, "wl radio");
-	else if (!strcmp(ifc, "5G"))
-		sprintf(buf, "wl -i eth2 radio");
-	else
-		return 0;
-
-	fp = popen(buf, "r");
-	if (fp == NULL) {
-		perror("popen");
-		return 0;
-	}
-
-	line = fgets(buf, sizeof(buf), fp);
-	if (line == NULL)
-		ret = 0;
-	else if (strstr(line, "0x0000"))
-		puts("1");
-	else if (strstr(line, "0x0001"))
-		puts("0");
-	else
-		ret = 0;
-
-	return ret;
-}
-#endif
-
-

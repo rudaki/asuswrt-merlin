@@ -1,8 +1,7 @@
 /**************************************************************************
  *   nano.h  --  This file is part of GNU nano.                           *
  *                                                                        *
- *   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,  *
- *   2008, 2009, 2010, 2011, 2013, 2014 Free Software Foundation, Inc.    *
+ *   Copyright (C) 1999-2011, 2013-2017 Free Software Foundation, Inc.    *
  *   Copyright (C) 2014, 2015, 2016 Benno Schulenberg                     *
  *                                                                        *
  *   GNU nano is free software: you can redistribute it and/or modify     *
@@ -49,10 +48,6 @@
 #include <sys/param.h>
 #endif
 
-#ifdef HAVE_STDARG_H
-#include <stdarg.h>
-#endif
-
 /* Suppress warnings for __attribute__((warn_unused_result)). */
 #define IGNORE_CALL_RESULT(call) do { if (call) {} } while(0)
 
@@ -69,6 +64,13 @@
 #define charealloc(ptr, howmuch) (char *)nrealloc(ptr, (howmuch) * sizeof(char))
 #define charmove(dest, src, n) memmove(dest, src, (n) * sizeof(char))
 #define charset(dest, src, n) memset(dest, src, (n) * sizeof(char))
+
+/* In UTF-8 a character is at most six bytes long. */
+#ifdef ENABLE_UTF8
+#define MAXCHARLEN 6
+#else
+#define MAXCHARLEN 1
+#endif
 
 /* Set a default value for PATH_MAX if there isn't one. */
 #ifndef PATH_MAX
@@ -116,50 +118,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#ifdef HAVE_REGEX_H
 #include <regex.h>
-#endif
 #include <signal.h>
 #include <assert.h>
 
-/* If no vsnprintf(), use the version from glib 2.x. */
-#ifndef HAVE_VSNPRINTF
-#include <glib.h>
-#define vsnprintf g_vsnprintf
-#endif
-
-/* If no isblank(), iswblank(), strcasecmp(), strncasecmp(),
- * strcasestr(), strnlen(), getdelim(), or getline(), use the versions
- * we have. */
-#ifndef HAVE_ISBLANK
-#define isblank nisblank
-#endif
-#ifndef HAVE_ISWBLANK
-#define iswblank niswblank
-#endif
-#ifndef HAVE_STRCASECMP
-#define strcasecmp nstrcasecmp
-#endif
-#ifndef HAVE_STRNCASECMP
-#define strncasecmp nstrncasecmp
-#endif
-#ifndef HAVE_STRCASESTR
-#define strcasestr nstrcasestr
-#endif
-#ifndef HAVE_STRNLEN
-#define strnlen nstrnlen
-#endif
-#ifndef HAVE_GETDELIM
-#define getdelim ngetdelim
-#endif
-#ifndef HAVE_GETLINE
-#define getline ngetline
-#endif
-
-/* If we aren't using ncurses with mouse support, turn the mouse support
- * off, as it's useless then. */
+/* If we aren't using an ncurses with mouse support, exclude any
+ * mouse routines, as they are useless then. */
 #ifndef NCURSES_MOUSE_VERSION
-#define DISABLE_MOUSE 1
+#undef ENABLE_MOUSE
 #endif
 
 #if defined(DISABLE_WRAPPING) && defined(DISABLE_JUSTIFY)
@@ -192,11 +158,11 @@ typedef enum {
 } update_type;
 
 typedef enum {
-    ADD, DEL, BACK, CUT, CUT_EOF, REPLACE,
+    ADD, DEL, BACK, CUT, CUT_TO_EOF, REPLACE,
 #ifndef DISABLE_WRAPPING
     SPLIT_BEGIN, SPLIT_END,
 #endif
-#ifndef DISABLE_COMMENT
+#ifdef ENABLE_COMMENT
     COMMENT, UNCOMMENT, PREFLIGHT,
 #endif
     JOIN, PASTE, INSERT, ENTER, OTHER
@@ -252,8 +218,10 @@ typedef struct syntaxtype {
 	/* The command with which to lint this type of file. */
     char *formatter;
         /* The formatting command (for programming languages mainly). */
+#ifdef ENABLE_COMMENT
     char *comment;
 	/* The line comment prefix (and postfix) for this type of file. */
+#endif
     colortype *color;
 	/* The colors and their regexes used in this syntax. */
     int nmultis;
@@ -288,6 +256,8 @@ typedef struct lintstruct {
 	/* Whole line engulfed by the regex, start < me, end > me. */
 #define CSTARTENDHERE	(1<<5)
 	/* Regex starts and ends within this line. */
+#define CWOULDBE	(1<<6)
+	/* An unpaired start match on or before this line. */
 #endif /* !DISABLE_COLOR */
 
 /* More structure types. */
@@ -389,6 +359,9 @@ typedef struct openfilestruct {
 	/* The current line for this file. */
     size_t totsize;
 	/* The file's total number of characters. */
+    size_t firstcolumn;
+	/* The starting column of the top line of the edit window.
+	 * When not in softwrap mode, it's always zero. */
     size_t current_x;
 	/* The file's x-coordinate position. */
     size_t placewewant;
@@ -431,7 +404,7 @@ typedef struct openfilestruct {
 	/* The preceding open file, if any. */
 } openfilestruct;
 
-#ifndef DISABLE_NANORC
+#ifdef ENABLE_NANORC
 typedef struct rcoption {
     const char *name;
 	/* The name of the rcfile option. */
@@ -469,7 +442,7 @@ typedef struct subnfunc {
 	/* In what menus this function applies. */
     const char *desc;
 	/* The function's short description, for example "Where Is". */
-#ifndef DISABLE_HELP
+#ifdef ENABLE_HELP
     const char *help;
 	/* The help-screen text for this function. */
     bool blank_after;
@@ -507,7 +480,7 @@ enum
 {
     DONTUSE,
     CASE_SENSITIVE,
-    CONST_UPDATE,
+    CONSTANT_SHOW,
     NO_HELP,
     SUSPEND,
     NO_WRAP,
@@ -516,7 +489,7 @@ enum
     USE_MOUSE,
     USE_REGEXP,
     TEMP_FILE,
-    CUT_TO_END,
+    CUT_FROM_CURSOR,
     BACKWARDS_SEARCH,
     MULTIBUFFER,
     SMOOTH_SCROLL,
@@ -545,7 +518,9 @@ enum
     MAKE_IT_UNIX,
     JUSTIFY_TRIM,
     SHOW_CURSOR,
-    LINE_NUMBERS
+    LINE_NUMBERS,
+    NO_PAUSES,
+    AT_BLANKS
 };
 
 /* Flags for the menus in which a given function should be present. */
@@ -564,9 +539,15 @@ enum
 #define MGOTODIR		(1<<12)
 #define MYESNO			(1<<13)
 #define MLINTER			(1<<14)
+#define MFINDINHELP		(1<<15)
 /* This is an abbreviation for all menus except Help and YesNo. */
 #define MMOST  (MMAIN|MWHEREIS|MREPLACE|MREPLACEWITH|MGOTOLINE|MWRITEFILE|MINSERTFILE|\
-		MEXTCMD|MBROWSER|MWHEREISFILE|MGOTODIR|MSPELL|MLINTER)
+		MEXTCMD|MBROWSER|MWHEREISFILE|MGOTODIR|MFINDINHELP|MSPELL|MLINTER)
+#ifndef NANO_TINY
+#define MSOME  MMOST
+#else
+#define MSOME  MMAIN|MBROWSER
+#endif
 
 /* Basic control codes. */
 #define TAB_CODE  0x09
@@ -578,10 +559,14 @@ enum
 #define CONTROL_RIGHT 0x402
 #define CONTROL_UP 0x403
 #define CONTROL_DOWN 0x404
+#define CONTROL_HOME 0x411
+#define CONTROL_END 0x412
 #define SHIFT_CONTROL_LEFT 0x405
 #define SHIFT_CONTROL_RIGHT 0x406
 #define SHIFT_CONTROL_UP 0x407
 #define SHIFT_CONTROL_DOWN 0x408
+#define SHIFT_CONTROL_HOME 0x413
+#define SHIFT_CONTROL_END 0x414
 #define SHIFT_ALT_LEFT 0x409
 #define SHIFT_ALT_RIGHT 0x40a
 #define SHIFT_ALT_UP 0x40b
@@ -590,6 +575,15 @@ enum
 #define SHIFT_PAGEDOWN 0x40e
 #define SHIFT_HOME 0x40f
 #define SHIFT_END 0x410
+
+#ifdef USE_SLANG
+#ifdef ENABLE_UTF8
+#define KEY_BAD 0xFF  /* Clipped error code. */
+#endif
+#define KEY_FLUSH 0x91  /* User-definable control code. */
+#else
+#define KEY_FLUSH KEY_F0  /* Nonexistent function key. */
+#endif
 
 #ifndef NANO_TINY
 /* An imaginary key for when we get a SIGWINCH (window resize). */
@@ -612,6 +606,9 @@ enum
 
 /* The default width of a tab in spaces. */
 #define WIDTH_OF_TAB 8
+
+/* The default comment character when a syntax does not specify any. */
+#define GENERAL_COMMENT_CHARACTER "#"
 
 /* The maximum number of search/replace history strings saved, not
  * counting the blank lines at their ends. */

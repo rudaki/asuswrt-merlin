@@ -1799,25 +1799,13 @@ int
 ej_wl_control_channel(int eid, webs_t wp, int argc, char_t **argv)
 {
 	int ret = 0;
-	int channel_24 = 0, channel_50 = 0;
-#if defined(RTAC3200) || defined(RTAC5300) || defined(RTAC5300R)
-	int channel_50_2 = 0;
-#endif
-	channel_24 = wl_control_channel(0);
 
-	if (!(channel_50 = wl_control_channel(1)))
-		ret = websWrite(wp, "[\"%d\", \"%d\"]", channel_24, 0);
-	else
-#if !defined(RTAC3200) && !defined(RTAC5300) && !defined(RTAC5300R)
-		ret = websWrite(wp, "[\"%d\", \"%d\"]", channel_24, channel_50);
-#else
-	{
-		if (!(channel_50_2 = wl_control_channel(2)))
-			ret = websWrite(wp, "[\"%d\", \"%d\", \"%d\"]", channel_24, channel_50, 0);
-		else
-			ret = websWrite(wp, "[\"%d\", \"%d\", \"%d\"]", channel_24, channel_50, channel_50_2);
-	}
+	ret = websWrite(wp, "[\"%d\", \"%d\"", wl_control_channel(0), wl_control_channel(1));
+
+#if defined(RTAC3200) || defined(RTAC5300) || defined(RTAC5300R)
+	ret += websWrite(wp, ", \"%d\"", wl_control_channel(2));
 #endif
+	ret += websWrite(wp, "]");
 
 	return ret;
 }
@@ -2338,90 +2326,63 @@ ej_wl_rate_5g_2(int eid, webs_t wp, int argc, char_t **argv)
 	return ej_wl_rate(eid, wp, argc, argv, 2);
 }
 
-static int wps_error_count = 0;
+static int wps_stop_count = 0;
+
+static void reset_wps_status()
+{
+	if (++wps_stop_count > 30)
+	{
+		wps_stop_count = 0;
+		nvram_set("wps_proc_status_x", "0");
+	}
+}
 
 char *
 getWscStatusStr()
 {
-	char *status;
-
-	status = nvram_safe_get("wps_proc_status");
+	char *status = nvram_safe_get("wps_proc_status_x");
 
 	switch (atoi(status)) {
-#if 1	/* AP mode */
 	case 1: /* WPS_ASSOCIATED */
-		wps_error_count = 0;
+		wps_stop_count = 0;
 		return "Start WPS Process";
 		break;
 	case 2: /* WPS_OK */
 	case 7: /* WPS_MSGDONE */
-		wps_error_count = 0;
+		reset_wps_status();
 		return "Success";
 		break;
 	case 3: /* WPS_MSG_ERR */
-		if (++wps_error_count > 60)
-		{
-			wps_error_count = 0;
-			nvram_set("wps_proc_status", "0");
-		}
+		reset_wps_status();
 		return "Fail due to WPS message exchange error!";
 		break;
 	case 4: /* WPS_TIMEOUT */
-		if (++wps_error_count > 60)
-		{
-			wps_error_count = 0;
-			nvram_set("wps_proc_status", "0");
-		}
+		reset_wps_status();
 		return "Fail due to WPS time out!";
 		break;
+	case 5: /* WPS_UI_SENDM2 */
+		return "Send M2";
+		break;
+	case 6: /* WPS_UI_SENDM7 */
+		return "Send M7";
+		break;
 	case 8: /* WPS_PBCOVERLAP */
-		if (++wps_error_count > 60)
-		{
-			wps_error_count = 0;
-			nvram_set("wps_proc_status", "0");
-		}
-		return "Fail due to WPS session overlap!";
+		reset_wps_status();
+		return "Fail due to PBC session overlap!";
+		break;
+	case 9: /* WPS_UI_FIND_PBC_AP */
+		return "Finding a PBC access point...";
+		break;
+	case 10: /* WPS_UI_ASSOCIATING */
+		return "Assciating with access point...";
 		break;
 	default:
-		wps_error_count = 0;
+		wps_stop_count = 0;
 		if (nvram_match("wps_enable", "1"))
 			return "Idle";
 		else
 			return "Not used";
 		break;
-#else	/* STA mode */
-	case 0:
-		return "Idle";
-		break;
-	case 1: /* WPS_ASSOCIATED */
-		return "Start enrolling...";
-		break;
-	case 2: /* WPS_OK */
-		return "Succeeded...";
-		break;
-	case 3: /* WPS_MSG_ERR */
-		return "Failed...";
-		break;
-	case 4: /* WPS_TIMEOUT */
-		return "Failed (timeout)...";
-		break;
-	case 7: /* WPS_MSGDONE */
-		return "Success";
-		break;
-	case 8: /* WPS_PBCOVERLAP */
-		return "Failed (pbc overlap)...";
-		break;
-	case 9: /* WPS_FIND_PBC_AP */
-		return "Finding a pbc access point...";
-		break;
-	case 10: /* WPS_ASSOCIATING */
-		return "Assciating with access point...";
-		break;
-	default:
-//		return "Init...";
-		return "Start WPS Process";
-		break;
-#endif
 	}
 }
 
@@ -2620,6 +2581,7 @@ int wl_wps_info(int eid, webs_t wp, int argc, char_t **argv, int unit)
 	}
 
 	//6. WPAKey
+#if 0	//hide for security
 #ifdef RTCONFIG_QTN
 	if (unit)
 	{
@@ -2652,6 +2614,9 @@ int wl_wps_info(int eid, webs_t wp, int argc, char_t **argv, int unit)
 		char_to_ascii(tmpstr, nvram_safe_get(strcat_r(prefix, "wpa_psk", tmp)));
 		retval += websWrite(wp, "<wps_info>%s</wps_info>\n", tmpstr);
 	}
+#else
+	retval += websWrite(wp, "<wps_info></wps_info>\n");
+#endif
 
 	//7. AP PIN Code
 #ifdef RTCONFIG_QTNBAK
@@ -2679,6 +2644,7 @@ int wl_wps_info(int eid, webs_t wp, int argc, char_t **argv, int unit)
 	}
 
 	//8. Saved WPAKey
+#if 0	//hide for security
 #ifdef RTCONFIG_QTN
 	if (unit)
 	{
@@ -2708,7 +2674,9 @@ int wl_wps_info(int eid, webs_t wp, int argc, char_t **argv, int unit)
 		char_to_ascii(tmpstr, nvram_safe_get(strcat_r(prefix, "wpa_psk", tmp)));
 		retval += websWrite(wp, "<wps_info>%s</wps_info>\n", tmpstr);
 	}
-
+#else
+	retval += websWrite(wp, "<wps_info></wps_info>\n");
+#endif
 	//9. WPS enable?
 	if (!strcmp(nvram_safe_get(strcat_r(prefix, "wps_mode", tmp)), "enabled"))
 		retval += websWrite(wp, "<wps_info>%s</wps_info>\n", "1");
@@ -2726,7 +2694,7 @@ int wl_wps_info(int eid, webs_t wp, int argc, char_t **argv, int unit)
 	retval += websWrite(wp, "<wps_info>%s</wps_info>\n", nvram_safe_get(strcat_r(prefix, "auth_mode_x", tmp)));
 
 	//C. WPS band
-	retval += websWrite(wp, "<wps_info>%d</wps_info>\n", nvram_get_int("wps_band"));
+	retval += websWrite(wp, "<wps_info>%d</wps_info>\n", nvram_get_int("wps_band_x"));
 
 	retval += websWrite(wp, "</wps>");
 
@@ -4835,7 +4803,7 @@ ej_wl_status_array(int eid, webs_t wp, int argc, char_t **argv, int unit)
 			if ((int)sta->tx_rate > 0)
 				sprintf(txrate,"%d", sta->tx_rate / 1000);
 			else
-				sprintf(rxrate,"??");
+				sprintf(txrate,"??");
 
 			ret += websWrite(wp, "\"%s\", \"%s\",", rxrate, txrate);
 
@@ -4979,7 +4947,7 @@ ej_wl_status_array(int eid, webs_t wp, int argc, char_t **argv, int unit)
 					if ((int)sta->tx_rate > 0)
 						sprintf(txrate,"%d", sta->tx_rate / 1000);
 					else
-						sprintf(rxrate,"??");
+						sprintf(txrate,"??");
 
 					ret += websWrite(wp, "\"%s\",\"%s\",", rxrate, txrate);
 

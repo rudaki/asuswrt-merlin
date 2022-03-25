@@ -61,7 +61,7 @@
 }
 </style>
 <script>
-var dhcp_staticlist_array = '<% nvram_get("dhcp_staticlist"); %>';
+var dhcp_staticlist_array = "<% nvram_get("dhcp_staticlist"); %>";
 
 if(pptpd_support){
 	var pptpd_clients = '<% nvram_get("pptpd_clients"); %>';
@@ -98,6 +98,7 @@ if(yadns_support){
 var backup_mac = "";
 var backup_ip = "";
 var backup_name = "";
+var sortCol, sortMethod;
 
 function initial(){
 	show_menu();
@@ -113,8 +114,13 @@ function initial(){
   				}
 			}
 	}
-	//}Viz 2011.10
-	setTimeout("showdhcp_staticlist();", 100);
+	if (((sortCol = cookie.get('dhcp_sortcol')) != null) && ((sortMethod = cookie.get('dhcp_sortmet')) != null)) {
+		document.getElementById("col" + sortCol).style.borderBottom="2px solid #fc0";
+		merlinWS.sortMethod = parseInt(sortMethod);
+		setTimeout("merlinWS.sortStaticIpList(sortCol);", 100);
+	} else {
+		setTimeout("merlinWS.sortStaticIpList(1);", 100);
+	}
 	setTimeout("showDropdownClientList('setClientIP', 'mac>ip>name', 'all', 'ClientList_Block_PC', 'pull_arrow', 'all');", 1000);
 
 	if(pptpd_support){
@@ -193,7 +199,7 @@ function addRow_Group(upper){
 		//Viz check same rule  //match(ip or mac) is not accepted
 		if(item_num >=2){
 			for(i=0; i<rule_num; i++){
-					if(document.form.dhcp_staticmac_x_0.value.toLowerCase() == document.getElementById('dhcp_staticlist_table').rows[i].cells[0].innerHTML.toLowerCase()){
+					if(document.form.dhcp_staticmac_x_0.value.toUpperCase() == document.getElementById('dhcp_staticlist_table').rows[i].cells[0].innerHTML.toUpperCase()){
 						alert("<#JS_duplicate#>");
 						document.form.dhcp_staticmac_x_0.focus();
 						document.form.dhcp_staticmac_x_0.select();
@@ -283,7 +289,7 @@ function showdhcp_staticlist(){
 			var userIconBase64 = "NoIcon";
 			var clientName, deviceType, deviceVender;
 
-			var clientMac = dhcp_staticlist_col[0];
+			var clientMac = dhcp_staticlist_col[0].toUpperCase();
 			var clientIP = dhcp_staticlist_col[1];
 			if(clientList[clientMac]) {
 				clientName = (clientList[clientMac].nickName == "") ? clientList[clientMac].name : clientList[clientMac].nickName;
@@ -623,6 +629,9 @@ var merlinWS = {
 	sortStaticIpList: function(colIndex) {
 		var theList = merlinWS.parseAsusList(dhcp_staticlist_array);
 
+		cookie.set('dhcp_sortcol', colIndex);
+		cookie.set('dhcp_sortmet', merlinWS.sortMethod);
+
 		if (colIndex == 1) {
 			theList.sort(merlinWS.sortBy(colIndex, true, null, {isIp: true}));
 		} else {
@@ -939,9 +948,9 @@ jQuery(function($) {
 			  	</thead>
 
 			  	<tr>
-					<th><a class="hintstyle" href="javascript:void(0);" onClick="openHint(5,10);"><#MAC_Address#></a></th>
-					<th><#IPConnection_ExternalIPAddress_itemname#></th>
-					<th>Hostname</th>
+					<th id="col0"><a class="hintstyle" href="javascript:void(0);" onClick="openHint(5,10);"><#MAC_Address#></a></th>
+					<th id="col1"><#IPConnection_ExternalIPAddress_itemname#></th>
+					<th id="col2">Hostname</th>
 					<th><#list_add_delete#></th>
 			  	</tr>
 			  	<tr>
@@ -955,7 +964,7 @@ jQuery(function($) {
             				<input type="text" class="input_15_table" maxlength="15" name="dhcp_staticip_x_0" onkeypress="return validator.isIPAddr(this,event)" autocorrect="off" autocapitalize="off">
             			</td>
             			<td width="24%">
-					<input type="text" class="input_15_table" maxlenght="30" onkeypress="return is_alphanum(this, event);" name="dhcp_staticname_x_0" autocorrect="off" autocapitalize="off">
+					<input type="text" class="input_15_table" maxlenght="30" onKeyPress="return validator.isString(this, event);" name="dhcp_staticname_x_0" autocorrect="off" autocapitalize="off">
 				</td>
 				<td width="16%">
 					<div>

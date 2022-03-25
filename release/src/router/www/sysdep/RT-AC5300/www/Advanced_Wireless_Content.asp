@@ -63,11 +63,6 @@ function initial(){
 		document.getElementById('wl_mode_desc').onclick=function(){return openHint(1, 4)};
 	}
 
-	// special case after modifing GuestNetwork
-	if(wl_unit == "-1" && "<% nvram_get("wl_subunit"); %>" == "-1"){
-		change_wl_unit();
-	}
-
 	wl_auth_mode_change(1);
 
 	if(optimizeXbox_support){
@@ -788,7 +783,7 @@ function regen_auto_option(obj){
 <input type="hidden" name="acs_band1" value='<% nvram_get("acs_band1"); %>'>
 <input type="hidden" name="acs_ch13" value='<% nvram_get("acs_ch13"); %>'>
 <input type="hidden" name="wps_enable" value="<% nvram_get("wps_enable"); %>">
-<input type="hidden" name="wps_band" value="<% nvram_get("wps_band"); %>">
+<input type="hidden" name="wps_band" value="<% nvram_get("wps_band_x"); %>">
 <input type="hidden" name="wps_dualband" value="<% nvram_get("wps_dualband"); %>">
 <input type="hidden" name="smart_connect_x" value="<% nvram_get("smart_connect_x"); %>">
 <input type="hidden" name="wl1_80211h" value="<% nvram_get("wl1_80211h"); %>" >
@@ -986,7 +981,7 @@ function regen_auto_option(obj){
 			  	<tr>
 					<th><a class="hintstyle" href="javascript:void(0);" onClick="openHint(0, 7);"><#WLANConfig11b_x_PSKKey_itemname#></a></th>
 					<td>
-				  		<input type="text" name="wl_wpa_psk" maxlength="64" class="input_32_table" value="<% nvram_get("wl_wpa_psk"); %>" autocorrect="off" autocapitalize="off">
+				  		<input name="wl_wpa_psk" maxlength="64" class="input_32_table" value="<% nvram_get("wl_wpa_psk"); %>" type="password" autocorrect="off" autocapitalize="off">
 					</td>
 			  	</tr>
 			  		  
@@ -1037,7 +1032,7 @@ function regen_auto_option(obj){
 			  	<tr>
 					<th><a class="hintstyle" href="javascript:void(0);" onClick="openHint(0, 8);"><#WLANConfig11b_x_Phrase_itemname#></a></th>
 					<td>
-				  		<input type="text" name="wl_phrase_x" maxlength="64" class="input_32_table" value="<% nvram_get("wl_phrase_x"); %>" onKeyUp="return is_wlphrase('WLANConfig11b', 'wl_phrase_x', this);" autocorrect="off" autocapitalize="off">
+				  		<input name="wl_phrase_x" maxlength="64" class="input_32_table" value="<% nvram_get("wl_phrase_x"); %>" onKeyUp="return is_wlphrase('WLANConfig11b', 'wl_phrase_x', this);" type="password" autocorrect="off" autocapitalize="off">
 					</td>
 			  	</tr>
 			  
@@ -1079,5 +1074,14 @@ function regen_auto_option(obj){
 </table>
 
 <div id="footer"></div>
+<script>
+(function() {
+	// special case after modifing GuestNetwork
+	// case 1 is after enable GuestNetwork, case 2 is after disable GuestNetwork
+	if('<% nvram_get("wl_unit"); %>' == "-1" || '<% nvram_get("wl_subunit"); %>' != "-1") {
+		change_wl_unit();
+	}
+})();
+</script>
 </body>
 </html>

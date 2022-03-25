@@ -219,28 +219,18 @@ var isIE9 = navigator.userAgent.search("MSIE 9") > -1;
 var remaining_time = 60 - login_info.lock_time;
 var countdownid, rtime_obj;
 var redirect_page = login_info.page;
-var cloud_file = '<% get_parameter("file"); %>';
+
 if ('<% nvram_get("http_dut_redir"); %>' == '1') {
 var isRouterMode = ('<% nvram_get("sw_mode"); %>' == '1') ? true : false;
 
-var header_info = [<% get_header_info(); %>];
-var ROUTERHOSTNAME = header_info[0].host;
-var get_protocol = function() {
-	var protocol = "http:";
-	if(window.location.protocol == "http:" || window.location.protocol == "https:") {
-		protocol = window.location.protocol;
-		return protocol;
-	}
-
-	return protocol;
-};
-
-var iAmAlive = function(ret){if(ret.isdomain) top.location.href=top.location.href.replace(location.hostname, ROUTERHOSTNAME)};
+var header_info = [<% get_header_info(); %>][0];
+var ROUTERHOSTNAME = '<% nvram_get("local_domain"); %>';
+var domainNameUrl = ((header_info.host.split(":").length==2)?"https":"http")+"://"+header_info.host.replace(header_info.host.split(":")[0], ROUTERHOSTNAME);
+var chdom = function(){window.location.href=domainNameUrl};
 (function(){
-	var locationOrigin = get_protocol() + "//" + ROUTERHOSTNAME + (window.location.port ? ':' + window.location.port : '');
-	if(location.hostname !== ROUTERHOSTNAME && ROUTERHOSTNAME != "" && isRouterMode){
+	if(ROUTERHOSTNAME !== header_info.host && ROUTERHOSTNAME != "" && isRouterMode){
 		setTimeout(function(){
-			var s=document.createElement("script");s.type="text/javascript";s.src=locationOrigin+"/httpd_check.json?hostname="+location.hostname;;var h=document.getElementsByTagName("script")[0];h.parentNode.insertBefore(s,h);
+			var s=document.createElement("script");s.type="text/javascript";s.src=domainNameUrl+"/chdom.json?hostname="+header_info.host.split(":")[0];var h=document.getElementsByTagName("script")[0];h.parentNode.insertBefore(s,h);
 		}, 1);
 	}
 })();
@@ -431,11 +421,6 @@ function login(){
 	}
 	catch(e){
 		document.form.next_page.value = "index.asp";
-	}		
-
-	if(document.form.next_page.value == "cloud_sync.asp"){
-		document.form.cloud_file.disabled = false;
-		document.form.cloud_file.value = cloud_file;
 	}
 
 	document.form.submit();
@@ -471,7 +456,6 @@ function disable_button(val){
 <input type="hidden" name="current_page" value="Main_Login.asp">
 <input type="hidden" name="next_page" value="Main_Login.asp">
 <input type="hidden" name="login_authorization" value="">
-<input type="hidden" name="cloud_file" value="" disabled>
 <div class="div_table main_field_gap">
 	<div class="div_tr">
 		<div id="warming_field" style="display:none;" class="warming_desc">Note: the router you are using is not an ASUS device or has not been authorised by ASUS. ASUSWRT might not work properly on this device.</div>
@@ -496,7 +480,7 @@ function disable_button(val){
 				<input type="password" name="login_passwd" tabindex="2" class="form_input" maxlength="16" placeholder="<#HSDPAConfig_Password_itemname#>" autocapitalize="off" autocomplete="off">
 			</div>
 			<div class="error_hint" style="display:none;" id="error_status_field"></div>
-				<div class="button" onclick="login();"><#CTL_signin#></div>
+			<input type="submit" value="<#CTL_signin#>" class="button" style="border-style: hidden;" onclick="login();">
 		</div>
 
 		<!-- No Login field -->

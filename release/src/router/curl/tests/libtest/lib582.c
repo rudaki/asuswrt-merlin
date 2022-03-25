@@ -145,10 +145,10 @@ static int curlTimerCallback(CURLM *multi, long timeout_ms, void *userp)
 /**
  * Check for curl completion.
  */
-static int checkForCompletion(CURLM* curl, int* success)
+static int checkForCompletion(CURLM *curl, int *success)
 {
   int numMessages;
-  CURLMsg* message;
+  CURLMsg *message;
   int result = 0;
   *success = 0;
   while((message = curl_multi_info_read(curl, &numMessages)) != NULL) {
@@ -174,8 +174,8 @@ static int getMicroSecondTimeout(struct timeval* timeout)
   struct timeval now;
   ssize_t result;
   now = tutil_tvnow();
-  result = (timeout->tv_sec - now.tv_sec) * 1000000 +
-    timeout->tv_usec - now.tv_usec;
+  result = (ssize_t)((timeout->tv_sec - now.tv_sec) * 1000000 +
+    timeout->tv_usec - now.tv_usec);
   if(result < 0)
     result = 0;
 
@@ -320,7 +320,7 @@ int test(char *URL)
       tv.tv_usec = 100000;
     }
 
-    select_test(maxFd, &readSet, &writeSet, NULL, &tv);
+    select_test((int)maxFd, &readSet, &writeSet, NULL, &tv);
 
     /* Check the sockets for reading / writing */
     checkFdSet(m, &sockets.read, &readSet, CURL_CSELECT_IN, "read");

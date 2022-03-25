@@ -82,6 +82,7 @@ typedef unsigned int __u32;   // 1225 ham
 #include <syslog.h>
 #include <mssl.h>
 #include <shutils.h>
+#include <sys/file.h>
 #define SERVER_PORT_SSL	443
 #endif
 #include "bcmnvram_f.h"
@@ -122,6 +123,7 @@ char referer_host[64];
 char current_page_name[128];
 char user_agent[1024];
 char gen_token[32]={0};
+char last_fail_token[32]={0};
 
 #ifdef TRANSLATE_ON_FLY
 char Accept_Language[16];
@@ -185,6 +187,8 @@ struct language_table language_tables[] = {
 	{"ms", "MS"},
 	{"ms-MY", "MS"},
 	{"ms-BN", "MS"},
+	{"nl", "NL"},
+	{"nl-NL", "NL"},
 	{"no", "NO"},
 	{"nb", "NO"},
 	{"nn", "NO"},
@@ -196,6 +200,8 @@ struct language_table language_tables[] = {
 	{"ru-ru", "RU"},
 	{"ro", "RO"},
 	{"ro-ro", "RO"},
+	{"sl", "SL"},
+	{"sl-SI", "SL"},
 	{"sv", "SV"},
 	{"sv-FI", "SV"},
 	{"sv-SE", "SV"},
@@ -217,7 +223,8 @@ struct language_table language_tables[] = {
 /* Forwards. */
 static int initialize_listen_socket(usockaddr* usa, const char *ifname);
 static int auth_check( char* dirname, char* authorization, char* url, char* file, char* cookies, int fromapp_flag);
-static int referer_check(char* referer, int fromapp_flag);
+int check_noauth_referrer(char* referer, int fromapp_flag);
+char *get_referrer(char *referer);
 char *generate_token(void);
 static void send_error( int status, char* title, char* extra_header, char* text );
 //#ifdef RTCONFIG_CLOUDSYNC
@@ -225,11 +232,9 @@ static void send_page( int status, char* title, char* extra_header, char* text ,
 //#endif
 static void send_headers( int status, char* title, char* extra_header, char* mime_type, int fromapp);
 static void send_token_headers( int status, char* title, char* extra_header, char* mime_type, int fromapp);
-static int match( const char* pattern, const char* string );
-static int match_one( const char* pattern, int patternlen, const char* string );
 static void handle_request(void);
 void send_login_page(int fromapp_flag, int error_status, char* url, char* file, int lock_time);
-void __send_login_page(int fromapp_flag, int error_status, char* url, int lock_time);
+void __send_login_page(int fromapp_flag, int error_status, char* url, char* file, int lock_time);
 int check_user_agent(char* user_agent);
 #ifdef RTCONFIG_IFTTT
 void add_ifttt_flag(void);
@@ -259,11 +264,6 @@ time_t last_login_timestamp=0; // the timestamp of the current session.
 unsigned int login_ip_tmp=0; // the ip of the current session.
 unsigned int login_try=0;
 unsigned int last_login_ip = 0;	// the last logined ip 2008.08 magic
-/* limit login IP addr; 2012.03 Yau */
-struct {
-	struct in_addr ip;
-	struct in_addr netmask;
-} access_ip[4];
 unsigned int MAX_login;
 int lock_flag = 0;
 
@@ -368,7 +368,7 @@ error:
 void 
 send_login_page(int fromapp_flag, int error_status, char* url, char* file, int lock_time)
 {
-	char inviteCode[256]={0};
+	char inviteCode[512]={0};
 	//char url_tmp[64]={0};
 	char *cp, *file_var=NULL;
 
@@ -400,52 +400,85 @@ send_login_page(int fromapp_flag, int error_status, char* url, char* file, int l
 }
 
 void
-__send_login_page(int fromapp_flag, int error_status, char* url, int lock_time)
+__send_login_page(int fromapp_flag, int error_status, char* url, char* file, int lock_time)
 {
 	login_try++;
 	last_login_timestamp = login_timestamp_tmp;
-	
-	send_login_page(fromapp_flag, error_status, url, NULL, lock_time);
+
+	send_login_page(fromapp_flag, error_status, url, file, lock_time);
 }
 
-static int
-referer_check(char* referer, int fromapp_flag)
+char
+*get_referrer(char *referer)
 {
 	char *auth_referer=NULL;
 	char *cp1=NULL, *cp2=NULL, *location_cp=NULL, *location_cp1=NULL;
+
+	if(strstr(referer,"\r") != (char*) 0)
+		location_cp1 = strtok(referer, "\r");
+	else
+		location_cp1 = referer;
+
+	location_cp = strstr(location_cp1,"//");
+	if(location_cp != (char*) 0){
+		cp1 = &location_cp[2];
+		if(strstr(cp1,"/") != (char*) 0){
+			cp2 = strtok(cp1, "/");
+			auth_referer = cp2;
+		}else
+			auth_referer = cp1;
+	}else
+		auth_referer = location_cp1;
+
+	return auth_referer;
+}
+
+/* That code is now closed source.  Until we get binary blobs for
+   all model, reuse the original code. */
+
+#ifdef MISSING_HOOKS
+int
+check_noauth_referrer(char* referer, int fromapp_flag)
+{
+	char *auth_referer=NULL;
+
+	if(fromapp_flag != 0)
+		return 0;
+
+	if(!referer || !strlen(host_name)){
+		return NOREFERER;
+	}else{
+		auth_referer = get_referrer(referer);
+	}
+
+	if(!strcmp(host_name, auth_referer))
+		return 0;
+	else
+		return REFERERFAIL;
+}
+
+int
+referer_check(char* referer, int fromapp_flag)
+{
+	char *auth_referer=NULL;
 	const int d_len = strlen(DUT_DOMAIN_NAME);
 	int port = 0;
 	int referer_from_https = 0;
-
+	int referer_host_check = 0;
 
 	if(fromapp_flag != 0)
 		return 0;
 	if(!referer){
-		send_login_page(fromapp_flag, NOREFERER, NULL, NULL, 0);
 		return NOREFERER;
 	}else{
-
-		if(strstr(referer,"\r") != (char*) 0)
-			location_cp1 = strtok(referer, "\r");
-		else
-			location_cp1 = referer;
-
-		location_cp = strstr(location_cp1,"//");
-		if(location_cp != (char*) 0){
-			cp1 = &location_cp[2];
-			if(strstr(cp1,"/") != (char*) 0){
-				cp2 = strtok(cp1, "/");
-				auth_referer = cp2;
-			}else
-				auth_referer = cp1;
-		}else
-			auth_referer = location_cp1;
-
+		auth_referer = get_referrer(referer);
 	}
+
 	if(referer_host[0] == 0){
-		send_login_page(fromapp_flag, WEB_NOREFERER, NULL, NULL, 0);
 		return WEB_NOREFERER;
 	}
+
+	if(!strcmp(host_name, auth_referer)) referer_host_check = 1;
 
 	if (*(auth_referer + d_len) == ':' && (port = atoi(auth_referer + d_len + 1)) > 0 && port < 65536)
 		referer_from_https = 1;
@@ -459,17 +492,18 @@ referer_check(char* referer, int fromapp_flag)
 	}
 
 	/* form based referer info? */
-	if((strlen(auth_referer) == strlen(referer_host)) && strncmp( auth_referer, referer_host, strlen(referer_host) ) == 0){
+	if(referer_host_check && (strlen(auth_referer) == strlen(referer_host)) && strncmp( auth_referer, referer_host, strlen(referer_host) ) == 0){
 		//_dprintf("asus token referer_check: the right user and password\n");
 		return 0;
 	}else{
 		//_dprintf("asus token referer_check: the wrong user and password\n");
-		send_login_page(fromapp_flag, REFERERFAIL, NULL, NULL, 0);
 		return REFERERFAIL;
 	}
-	send_login_page(fromapp_flag, REFERERFAIL, NULL, NULL, 0);
 	return REFERERFAIL;
 }
+
+#endif	// temporary code
+
 
 #define	HEAD_HTTP_LOGIN	"HTTP login"	// copy from push_log/push_log.h
 
@@ -498,11 +532,13 @@ auth_check( char* dirname, char* authorization, char* url, char* file, char* coo
 		temp_ip_addr.s_addr = login_ip_tmp;
 		temp_ip_str = inet_ntoa(temp_ip_addr);
 
-		if(login_try%MAX_login == 0)
-			logmessage(HEAD_HTTP_LOGIN, "Detect abnormal logins at %d times. The newest one was from %s.", login_try, temp_ip_str);
+		if(login_try%MAX_login == 0){
+			check_token_timeout_in_list();
+			logmessage(HEAD_HTTP_LOGIN, "Detect abnormal logins at %d times. The newest one was from %s in auth check.", login_try, temp_ip_str);
+		}
 
 //#ifdef LOGIN_LOCK
-		send_login_page(fromapp_flag, LOGINLOCK, url, NULL, dt);
+		__send_login_page(fromapp_flag, LOGINLOCK, url, NULL, dt);
 		return LOGINLOCK;
 //#endif
 	}
@@ -540,7 +576,12 @@ auth_check( char* dirname, char* authorization, char* url, char* file, char* coo
 		return 0;
 	}else{
 		//_dprintf("asus token auth_check: the wrong user and password\n");
-		send_login_page(fromapp_flag, AUTHFAIL, url, file, 0);
+		if(!strcmp(last_fail_token, asustoken))
+			send_login_page(fromapp_flag, AUTHFAIL, url, file, dt);
+		else{
+			strlcpy(last_fail_token, asustoken, sizeof(last_fail_token));
+			__send_login_page(fromapp_flag, AUTHFAIL, url, file, dt);
+		}
 		return AUTHFAIL;
 	}
 
@@ -687,7 +728,7 @@ match( const char* pattern, const char* string )
     }
 
 
-static int
+int
 match_one( const char* pattern, int patternlen, const char* string )
     {
     const char* p;
@@ -1101,7 +1142,7 @@ handle_request(void)
 	char *query;
 	int file_len;
 
-	memset(url, 0, 128);
+	memset(url, 0, sizeof(url));
 	if ((query = index(file, '?')) != NULL) {
 		file_len = strlen(file)-strlen(query);
 
@@ -1117,7 +1158,7 @@ handle_request(void)
 // 2007.11 James. }
 
 	memset(current_page_name, 0, sizeof(current_page_name));
-	strlcpy(current_page_name, file, sizeof(current_page_name));
+	strlcpy(current_page_name, url, sizeof(current_page_name));
 
 	if(strncmp(url, APPLYAPPSTR, strlen(APPLYAPPSTR))==0 
 #ifdef RTCONFIG_ROG
@@ -1166,8 +1207,6 @@ handle_request(void)
 		login_state = http_login_check();
 		// for each page, mime_exception is defined to do exception handler
 
-		mime_exception = 0;
-
 		// check exception first
 		for (exhandler = &except_mime_handlers[0]; exhandler->pattern; exhandler++) {
 			if(match(exhandler->pattern, url))
@@ -1176,8 +1215,6 @@ handle_request(void)
 				break;
 			}
 		}
-
-		do_referer = 0;
 
 		// check doreferer first
 		for (doreferer = &mime_referers[0]; doreferer->pattern; doreferer++) {
@@ -1201,11 +1238,9 @@ handle_request(void)
 			nvram_set_int("httpd_handle_request_fromapp", fromapp);
 			if(login_state==3 && !fromapp) { // few pages can be shown even someone else login
 				if(!(mime_exception&MIME_EXCEPTION_MAINPAGE || (strncmp(file, "Main_Login.asp", 14)==0 && login_error_status == 9) || ((!handler->auth) && strncmp(file, "Main_Login.asp", 14) != 0))) {
-					if(strcasecmp(method, "post") == 0){
-						if (handler->input) {
-							handler->input(file, conn_fp, cl, boundary);
-						}
-					}
+					if(strcasecmp(method, "post") == 0 && handler->input)   //response post request
+						while (cl--) (void)fgetc(conn_fp);
+
 					send_login_page(fromapp, NOLOGIN, NULL, NULL, 0);
 					return;
 				}
@@ -1220,12 +1255,10 @@ handle_request(void)
 					if(do_referer&CHECK_REFERER){
 						referer_result = referer_check(referer, fromapp);
 						if(referer_result != 0){
-							if(strcasecmp(method, "post") == 0){
-								if (handler->input) {
-									handler->input(file, conn_fp, cl, boundary);
-								}
-								send_login_page(fromapp, referer_result, NULL, NULL, 0);
-							}
+							if(strcasecmp(method, "post") == 0 && handler->input)   //response post request
+								while (cl--) (void)fgetc(conn_fp);
+
+							send_login_page(fromapp, referer_result, NULL, NULL, 0);
 							//if(!fromapp) http_logout(login_ip_tmp, cookies);
 							return;
 						}
@@ -1234,13 +1267,10 @@ handle_request(void)
 					auth_result = auth_check(auth_realm, authorization, url, file, cookies, fromapp);
 					if (auth_result != 0)
 					{
-						if(strcasecmp(method, "post") == 0){
-							if (handler->input) {
-								handler->input(file, conn_fp, cl, boundary);
-							}
-							send_login_page(fromapp, auth_result, NULL, NULL, 0);
-						}
-						//if(!fromapp) http_logout(login_ip_tmp, cookies);
+						if(strcasecmp(method, "post") == 0 && handler->input)   //response post request
+							while (cl--) (void)fgetc(conn_fp);
+
+						send_login_page(fromapp, auth_result, NULL, NULL, 0);
 						return;
 					}
 				}
@@ -1254,6 +1284,19 @@ handle_request(void)
 						http_login(login_ip_tmp, url);
 				}
 			}else{
+				if(fromapp == 0 && (do_referer&CHECK_REFERER)){
+					referer_result = check_noauth_referrer(referer, fromapp);
+					if(referer_result != 0){
+						if(strcasecmp(method, "post") == 0){
+							if (handler->input) {
+								handler->input(file, conn_fp, cl, boundary);
+							}
+						}
+						send_login_page(fromapp, referer_result, NULL, NULL, 0);
+						//if(!fromapp) http_logout(login_ip_tmp, cookies);
+						return;
+					}
+				}
 			}
 
 			if(!strcmp(file, "Logout.asp")){
@@ -1318,10 +1361,12 @@ handle_request(void)
 
 	if (!handler->pattern){
 		if(strlen(file) > 50 && !(strstr(file, "findasus")) && !(strstr(file, "acme-challenge"))){
-			char inviteCode[256];
+			char inviteCode[512];
 			memset(cloud_file, 0, sizeof(cloud_file));
-			strncpy(cloud_file, file, sizeof(cloud_file));
-			snprintf(inviteCode, sizeof(inviteCode), "<script>location.href='/cloud_sync.asp';</script>");
+			if(!check_xss_blacklist(file, 0))
+				strlcpy(cloud_file, file, sizeof(cloud_file));
+
+			snprintf(inviteCode, sizeof(inviteCode), "<meta http-equiv=\"refresh\" content=\"0; url=cloud_sync.asp?flag=%s\">\r\n", cloud_file);
 			send_page( 200, "OK", (char*) 0, inviteCode, 0);
 		}
 		else
@@ -1341,23 +1386,15 @@ asus_token_t* search_token_in_list(char* token, asus_token_t **prev)
 	while(ptr != NULL)
 	{
 		if(!strncmp(token, ptr->token, 32))
-        	{
+		{
 			found = 1;
 			break;
-        	}
-		else if(strncmp(token, "cgi_logout", 10) == 0){
-			cp = strtok(ptr->useragent, "-");
-
-			if(strcmp( cp, "asusrouter") != 0){
-				found = 1;
-				break;
-			}
-        	}
+		}
 		else
-        	{
+		{
 			tmp = ptr;
 			ptr = ptr->next;
-        	}
+		}
     	}
     	if(found == 1)
     	{
@@ -1388,18 +1425,14 @@ int delete_logout_from_list(char *cookies)
 		return 0;
 		
 	}else{
-		if(strncmp(cookies, "cgi_logout", 10) == 0){
-			strncpy(asustoken, cookies, sizeof(asustoken));
+		location_cp = strstr(cookies,"asus_token");
+		if(location_cp != NULL){
+			cp = &location_cp[11];
+			cp += strspn( cp, " \t" );
+			snprintf(asustoken, sizeof(asustoken), "%s", cp);
 		}else{
-			location_cp = strstr(cookies,"asus_token");
-			if(location_cp != NULL){		
-				cp = &location_cp[11];
-				cp += strspn( cp, " \t" );
-				snprintf(asustoken, sizeof(asustoken), "%s", cp);
-			}else{
-				//send_login_page(fromapp_flag, NOTOKEN);
-				return 0;
-			}
+			//send_login_page(fromapp_flag, NOTOKEN);
+			return 0;
 		}
 	}
 
@@ -1439,30 +1472,6 @@ void http_login_cache(usockaddr *u) {
 	temp_ip_str = inet_ntoa(temp_ip_addr);
 }
 
-void http_get_access_ip(void)
-{
-	struct in_addr addr4;
-	char *nv, *nvp, *b, *ip;
-	int i, size;
-
-	memset(&access_ip, 0, sizeof(access_ip));
-
-	nv = nvp = strdup(nvram_safe_get("http_clientlist"));
-	i = 0;
-	while (nv && (b = strsep(&nvp, "<")) != NULL && i < ARRAY_SIZE(access_ip)) {
-		ip = strsep(&b, "/");
-		size = (b && *b) ? strtoul(b, NULL, 10) : 32;
-		if (inet_pton(AF_INET, ip, &addr4) > 0) {
-			if (size > 32)
-				size = 32;
-			access_ip[i].ip.s_addr = addr4.s_addr;
-			access_ip[i].netmask.s_addr = htonl(0xffffffffUL << (32 - size));
-			i++;
-		}
-	}
-	free(nv);
-}
-
 void http_login(unsigned int ip, char *url) {
 	if(strncmp(url, "Main_Login.asp", strlen(url))==0)
 		return;
@@ -1495,24 +1504,6 @@ void http_login(unsigned int ip, char *url) {
 	memset(login_timestampstr, 0, 32);
 	sprintf(login_timestampstr, "%lu", login_timestamp);
 	nvram_set("login_timestamp", login_timestampstr);
-}
-
-int http_client_ip_check(void)
-{
-	int i = 0;
-
-	if (nvram_match("http_client", "1")) {
-		for (i = 0; i < ARRAY_SIZE(access_ip); i++) {
-			if (access_ip[i].ip.s_addr == INADDR_ANY)
-				continue;
-			if ((login_ip_tmp & access_ip[i].netmask.s_addr) ==
-			    (access_ip[i].ip.s_addr & access_ip[i].netmask.s_addr))
-				return 1;
-		}
-		return 0;
-	}
-
-	return 1;
 }
 
 // 0: can not login, 1: can login, 2: loginer, 3: not loginer
@@ -2107,14 +2098,12 @@ int main(int argc, char **argv)
 	detect_timestamp = 0;
 	signal_timestamp = 0;
 
-	http_get_access_ip();
-
 	/* Ignore broken pipes */
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGCHLD, reapchild);	// 0527 add
 
 #ifdef RTCONFIG_HTTPS
-	if (do_ssl)
+	//if (do_ssl)
 		start_ssl();
 #endif
 
@@ -2238,8 +2227,7 @@ int main(int argc, char **argv)
 				}
 
 				http_login_cache(&item->usa);
-				if (http_client_ip_check())
-					handle_request();
+				handle_request();
 				fflush(conn_fp);
 #ifdef RTCONFIG_HTTPS
 				if (!do_ssl)
@@ -2277,30 +2265,57 @@ int main(int argc, char **argv)
 #ifdef RTCONFIG_HTTPS
 void save_cert(void)
 {
+#if defined(RTCONFIG_JFFS2) || defined(RTCONFIG_BRCM_NAND_JFFS2) || defined(RTCONFIG_UBIFS)
+	eval("cp", "-p", "/etc/cert.pem", "/etc/key.pem", "/jffs/ssl/");
+#else
 	if (eval("tar", "-C", "/", "-czf", "/tmp/cert.tgz", "etc/cert.pem", "etc/key.pem") == 0) {
 		if (nvram_set_file("https_crt_file", "/tmp/cert.tgz", 8192)) {
 			nvram_commit_x();
 		}
 	}
 	unlink("/tmp/cert.tgz");
+#endif
+
 }
 
 void erase_cert(void)
 {
 	unlink("/etc/cert.pem");
 	unlink("/etc/key.pem");
+#if defined(RTCONFIG_JFFS2) || defined(RTCONFIG_BRCM_NAND_JFFS2) || defined(RTCONFIG_UBIFS)
+	unlink(JFFSCERT);
+	unlink(JFFSKEY);
+#else
 	nvram_unset("https_crt_file");
+#endif
 	//nvram_unset("https_crt_gen");
 	nvram_set("https_crt_gen", "0");
 }
 
 void start_ssl(void)
 {
-	int ok;
-	int save;
+	int lockfd;
+	int ok=0;
 	int retry;
 	unsigned long long sn;
-	char t[32];
+	int i;
+#if !defined(RTCONFIG_JFFS2) && !defined(RTCONFIG_BRCM_NAND_JFFS2) && !defined(RTCONFIG_UBIFS)
+        int save;
+
+	save = nvram_match("https_crt_save", "1");
+#endif
+
+	lockfd = open("/var/lock/sslinit.lock", O_CREAT | O_RDWR, 0666);
+
+	// Avoid collisions if another httpd instance is initializing SSL cert
+	for ( i = 1; i < 5; i++ ) {
+		if (flock(lockfd, LOCK_EX | LOCK_NB) < 0) {
+			//logmessage("httpd", "Conflict, waiting %d", i);
+			sleep(i*i);
+		} else {
+			i = 5;
+		}
+	}
 
 	//fprintf(stderr,"[httpd] start_ssl running!!\n");
 	//nvram_set("https_crt_gen", "1");
@@ -2310,11 +2325,20 @@ void start_ssl(void)
 	}
 
 	retry = 1;
+
 	while (1) {
-		save = nvram_match("https_crt_save", "1");
+
+#if defined(RTCONFIG_JFFS2) || defined(RTCONFIG_BRCM_NAND_JFFS2) || defined(RTCONFIG_UBIFS)
+		if (f_exists(JFFSCERT) && f_exists(JFFSKEY)) {
+			eval("cp", "-p", JFFSKEY, JFFSCERT, "/etc/");
+			system("cat /etc/key.pem /etc/cert.pem > /etc/server.pem");
+			ok = 1;
+		}
+#endif
 
 		if ((!f_exists("/etc/cert.pem")) || (!f_exists("/etc/key.pem"))) {
 			ok = 0;
+#if !defined(RTCONFIG_JFFS2) && !defined(RTCONFIG_BRCM_NAND_JFFS2) && !defined(RTCONFIG_UBIFS)
 			if (save) {
 				fprintf(stderr, "Save SSL certificate...\n"); // tmp test
 				if (nvram_get_file("https_crt_file", "/tmp/cert.tgz", 8192)) {
@@ -2331,27 +2355,40 @@ void start_ssl(void)
 					unlink("/tmp/cert.tgz");
 				}
 			}
+#endif
 			if (!ok) {
 				erase_cert();
-				syslog(LOG_NOTICE, "Generating SSL certificate...");
+				logmessage("httpd", "Generating SSL certificate...");
 				fprintf(stderr, "Generating SSL certificate...\n"); // tmp test
 				// browsers seems to like this when the ip address moves...	-- zzz
 				f_read("/dev/urandom", &sn, sizeof(sn));
 
-				sprintf(t, "%llu", sn & 0x7FFFFFFFFFFFFFFFULL);
-				eval("gencert.sh", t);
+				eval("gencert.sh", "web");
 			}
 		}
 
-		if ((save) && (*nvram_safe_get("https_crt_file")) == 0) {
+		if ((!ok)
+#if !defined(RTCONFIG_JFFS2) && !defined(RTCONFIG_BRCM_NAND_JFFS2) && !defined(RTCONFIG_UBIFS)
+		    && (save)
+		    && (*nvram_safe_get("https_crt_file")) == 0
+#endif
+		    ){
 			save_cert();
 		}
 
-		if (mssl_init("/etc/cert.pem", "/etc/key.pem")) return;
+		if (mssl_init("/etc/cert.pem", "/etc/key.pem")) {
+			flock(lockfd, LOCK_UN);
+			return;
+		}
 
+		logmessage("httpd", "Failed to initialize SSL, generating new key/cert.");
 		erase_cert();
 
-		if (!retry) exit(1);
+		if (!retry) {
+			flock(lockfd, LOCK_UN);
+			logmessage("httpd", "Unable to start in SSL mode, exiting!");
+			exit(1);
+		}
 		retry = 0;
 	}
 }

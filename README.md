@@ -1,7 +1,19 @@
 asuswrt-merlin
 ==============
 
-This is an enhanced version of Asuswrt - the firmware used by all recent Asus routers. 
+Notes
+-----
+This is the legacy 380.xx branch - this branch is no longer actively developed.
+All development has now been moved to the NG (New Generation) code branch:
+
+[https://github.com/RMerl/asuswrt-merlin.ng](https://github.com/RMerl/asuswrt-merlin.ng)
+
+
+#### I have disabled the issue tracker because apparently people can't read.  The tracker was 90% noise and 10% genuine bug reports, and I grew tired of cleaning it up.
+
+About
+-----
+Asuswrt-Merlin is an enhanced version of Asuswrt, the firmware used by Asus's modern routers.
 
 The goal of this project is to fix issues and bring some minor functionality adjustments to the 
 original Asus firmware.  While some features do get added, this is not the main focus of this project.  
@@ -13,6 +25,6 @@ Please consult the Wiki for an up-to-date list of supported models:
 https://github.com/RMerl/asuswrt-merlin/wiki/Supported-Devices
 
 
-Firmware builds can be downloaded from the official download site:
+Firmware images can be downloaded from the official web site:
 
-https://asuswrt.lostrealm.ca/download
+https://www.asuswrt-merlin.net/download

@@ -20,6 +20,7 @@ endif
 
 ifeq ($(RTCONFIG_QCA),y)
 CFLAGS += -I./sysdeps/qca -I$(TOP)/wireless_tools/ -DWE_NOLIBM
+CFLAGS += $(if $(RTCONFIG_SOC_IPQ8064),-DSMP)
 endif
 
 ifeq ($(RTCONFIG_BCMWL6),y)
@@ -67,9 +68,10 @@ endif
 
 OBJS = shutils.o linux_timer.o defaults.o model.o rtstate.o boardapi.o
 OBJS += misc.o version.o files.o strings.o process.o 
-OBJS += bin_sem_asus.o semaphore.o pids.o notify_rc.o discover.o
+OBJS += bin_sem_asus.o semaphore.o pids.o $(if $(wildcard notify_rc.c),notify_rc.o,prebuild/notify_rc.o) discover.o
 OBJS += base64.o
 OBJS += nvparse.o
+OBJS += scripts.o
 ifeq ($(RTCONFIG_BCM7),y)
 OBJS += et_linux.o bcmwifi_channels.o
 else ifeq ($(RTCONFIG_HSPOT),y)
@@ -98,7 +100,14 @@ endif
 else ifeq ($(RTCONFIG_QCA),y)
 # Qualcomm Atheros
 OBJS += $(TOP)/wireless_tools/iwlib.o
-OBJS += flash_mtd.o api-qca.o qca8337.o
+OBJS += flash_mtd.o api-qca.o 
+ifeq ($(or $(RTCONFIG_SWITCH_RTL8370M_PHY_QCA8033_X2),$(RTCONFIG_SWITCH_RTL8370MB_PHY_QCA8033_X2)),y)
+OBJS += qca8033_rtl8370m.o mdio.o
+else ifeq ($(RTCONFIG_SOC_IPQ40XX),y)
+OBJS += ipq40xx.o
+else
+OBJS += qca8337.o
+endif
 else
 # Broadcom
 OBJS += wl.o wl_linux.o
@@ -162,14 +171,14 @@ OBJS	+= $(if $(wildcard plc_utils.c),plc_utils.o,prebuild/plc_utils.o)
 endif
 
 ifeq ($(RTCONFIG_TCODE),y)
-OBJS    += tcode.o
+OBJS	+= $(if $(wildcard tcode.c),tcode.o,prebuild/tcode.o)
 endif
 
 ifeq ($(CONFIG_BCMWL5),y)
 ifneq ($(RTCONFIG_DSL),y)
 CFLAGS += -DTRX_NEW
 endif
-OBJS += private.o
+OBJS += $(if $(wildcard private.c),private.o,prebuild/private.o)
 OBJS += wlif_utils.o UdpLib.o bcmutils.o
 OBJS += bcmwifi_channels.o
 endif
@@ -209,9 +218,8 @@ install: all
 clean:
 	rm -f *.o *.so *.a .*.depend *.prep sysdeps/*.o sysdeps/broadcom/*.o sysdeps/ralink/*.o sysdeps/qtn/*.o
 
-%.o: prebuild/%.o
-	@echo " [shared] cp $@"
-	@cp -f $< $@
+prebuild/%.o:
+	#nothing to do...
 
 ifeq ($(RTCONFIG_USB),y)
 vpath %.c $(sort $(dir $(ID_OBJS)))
@@ -222,11 +230,6 @@ $(notdir $(ID_OBJS)): %.o: %.c .%.depend
 
 $(patsubst %.o,.%.depend,$(notdir $(ID_OBJS))): .%.depend: %.c
 	@$(CC) $(CFLAGS) $(ID_CFLAGS) -M $< > $@
-
-# ld -r --gc-sections is broken, so don't use it for now
-#volume_id.lib.o: $(notdir $(ID_OBJS))
-#	@echo " [shared] LD $@"
-#	@$(LD) -r -e find_label_or_uuid --gc-sections -o $@ $(notdir $(ID_OBJS))
 endif
 
 %.o: %.c .%.depend

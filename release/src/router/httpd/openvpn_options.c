@@ -7,13 +7,13 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#define TYPEDEF_BOOL
 #include <shared.h>
+#include <shutils.h>
+#include <bcmnvram.h>
 #include "httpd.h"
 #include "openvpn_options.h"
-#define TYPEDEF_BOOL
-#include <bcmnvram.h>
-#include <shared.h>
-#include "shutils.h"
+
 
 struct buffer
 alloc_buf (size_t size)
@@ -407,11 +407,24 @@ add_option (char *p[], int line, int unit)
 		sprintf(buf, "vpn_client%d_addr", unit);
 		nvram_set(buf, p[1]);
 
-		sprintf(buf, "vpn_client%d_port", unit);
 		if(p[2])
+		{
+			sprintf(buf, "vpn_client%d_port", unit);
 			nvram_set(buf, p[2]);
-		else
-			nvram_set(buf, "1194");
+		}
+		if(p[3])
+		{
+			sprintf(buf, "vpn_client%d_proto", unit);
+			if(!strncmp(p[3], "tcp", 3))
+				nvram_set(buf, "tcp-client");
+			else if(!strncmp(p[1], "udp", 3))
+				nvram_set(buf, "udp");
+		}
+	}
+	else if  (streq (p[0], "port") && p[1])
+	{
+		sprintf(buf, "vpn_client%d_port", unit);
+		nvram_set(buf, p[1]);
 	}
 	else if (streq (p[0], "resolv-retry") && p[1])
 	{
@@ -471,10 +484,13 @@ add_option (char *p[], int line, int unit)
 	{
 		sprintf(buf, "vpn_client%d_rgw", unit);
 		nvram_set(buf, "1");
+		sprintf(buf, "vpn_client%d_custom", unit);
+		add_custom(buf, p);
 	}
 	else if (streq (p[0], "verb") && p[1])
 	{
-		nvram_set("vpn_loglevel", p[1]);
+		sprintf(buf, "vpn_client%d_verb", unit);
+		nvram_set(buf, p[1]);
 	}
 	else if  (streq (p[0], "ca") && p[1])
 	{
@@ -488,12 +504,12 @@ add_option (char *p[], int line, int unit)
 			fp = fopen(file_path, "w");
 			if(fp) {
 				chmod(file_path, S_IRUSR|S_IWUSR);
-				fprintf(fp, "%s", data);
+				fprintf(fp, "%.3499s", data);
 				fclose(fp);
 			}
 			else
 #endif
-			write_encoded_crt(buf, data);
+			nvram_set(buf, strstr(p[2], "-----BEGIN"));
 		}
 		else
 		{
@@ -510,12 +526,12 @@ add_option (char *p[], int line, int unit)
 			fp = fopen(file_path, "w");
 			if(fp) {
 				chmod(file_path, S_IRUSR|S_IWUSR);
-				fprintf(fp, "%s", data);
+				fprintf(fp, "%.3499s", data);
 				fclose(fp);
 			}
 			else
 #endif
-			write_encoded_crt(buf, data);
+			nvram_set(buf, strstr(p[2], "-----BEGIN"));
 		}
 		else
 		{
@@ -532,12 +548,12 @@ add_option (char *p[], int line, int unit)
 			fp = fopen(file_path, "w");
 			if(fp) {
 				chmod(file_path, S_IRUSR|S_IWUSR);
-				fprintf(fp, "%s", data);
+				fprintf(fp, "%.3499s", data);
 				fclose(fp);
 			}
 			else
 #endif
-			write_encoded_crt(buf, data);
+			nvram_set(buf, strstr(p[2], "-----BEGIN"));
 		}
 		else
 		{
@@ -554,12 +570,12 @@ add_option (char *p[], int line, int unit)
 			fp = fopen(file_path, "w");
 			if(fp) {
 				chmod(file_path, S_IRUSR|S_IWUSR);
-				fprintf(fp, "%s", data);
+				fprintf(fp, "%.3499s", data);
 				fclose(fp);
 			}
 			else
 #endif
-			write_encoded_crt(buf, data);
+			nvram_set(buf, strstr(p[2], "-----BEGIN"));
 			//key-direction
 			sprintf(buf, "vpn_client%d_hmac", unit);
 			if(nvram_match(buf, "-1"))	//default, disable
@@ -584,12 +600,12 @@ add_option (char *p[], int line, int unit)
 			fp = fopen(file_path, "w");
 			if(fp) {
 				chmod(file_path, S_IRUSR|S_IWUSR);
-				fprintf(fp, "%s", data);
+				fprintf(fp, "%.3499s", data);
 				fclose(fp);
 			}
 			else
 #endif
-			write_encoded_crt(buf, data);
+			nvram_set(buf, strstr(p[2], "-----BEGIN"));
 			sprintf(buf, "vpn_client%d_hmac", unit);
 			nvram_set(buf, "3");	//Enable tls-crypt
 		}
@@ -614,12 +630,12 @@ add_option (char *p[], int line, int unit)
 			fp = fopen(file_path, "w");
 			if(fp) {
 				chmod(file_path, S_IRUSR|S_IWUSR);
-				fprintf(fp, "%s", data);
+				fprintf(fp, "%.3499s", data);
 				fclose(fp);
 			}
 			else
 #endif
-			write_encoded_crt(buf, data);
+			nvram_set(buf, strstr(p[2], "-----BEGIN"));
 		}
 		else
 		{
@@ -636,12 +652,12 @@ add_option (char *p[], int line, int unit)
 			fp = fopen(file_path, "w");
 			if(fp) {
 				chmod(file_path, S_IRUSR|S_IWUSR);
-				fprintf(fp, "%s", data);
+				fprintf(fp, "%.3499s", data);
 				fclose(fp);
 			}
 			else
 #endif
-			write_encoded_crt(buf, data);
+			nvram_set(buf, strstr(p[2], "-----BEGIN"));
 		}
 		else
 		{
@@ -664,6 +680,11 @@ add_option (char *p[], int line, int unit)
 	else if (streq (p[0], "key-direction") && p[1])
 	{
 		sprintf(buf, "vpn_client%d_hmac", unit);
+		nvram_set(buf, p[1]);
+	}
+	else if (streq (p[0], "reneg-sec") && p[1])
+	{
+		sprintf(buf, "vpn_client%d_reneg", unit);
 		nvram_set(buf, p[1]);
 	}
 	// These are already added by us
@@ -845,9 +866,9 @@ void parse_openvpn_status(int unit){
 				token = strtok(NULL, ",");	//Connected Since (time_t)
 				token = strtok(NULL, ",");	//Username, include'\n'
 				if(token)
-					fprintf(fpo, "%s", token);
+					fprintf(fpo, "%s\n", token);
 				else
-					fprintf(fpo, "NoUsername");
+					fprintf(fpo, "NoUsername\n");
 			}
 		}
 		fclose(fpi);

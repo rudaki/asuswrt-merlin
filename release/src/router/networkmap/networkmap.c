@@ -103,6 +103,12 @@ struct apple_model_handler apple_model_handlers[] = {
 	{ "d101ap",	"iPhone 7",	"10"},
 	{ "d11ap",	"iPhone 7 Plus","10"},
 	{ "d111ap",	"iPhone 7 Plus","10"},
+	{ "d20ap",	"iPhone 8"     ,"10"},
+	{ "d201ap",	"iPhone 8"     ,"10"},
+	{ "d21ap",	"iPhone 8 Plus","10"},
+	{ "d211ap",	"iPhone 8 Plus","10"},
+	{ "d22ap",	"iPhone X",     "10"},
+	{ "d221ap",	"iPhone X",     "10"},
         { "n45ap",      "iPod touch",	"21" },
         { "n72ap",      "iPod touch 2G","21" },
         { "n18ap",      "iPod touch 3G","21" },
@@ -998,23 +1004,10 @@ int main(int argc, char *argv[])
 
 	//Get Router's IP/Mac
 	strcpy(router_ipaddr, nvram_safe_get("lan_ipaddr"));
-#if defined(RTCONFIG_RGMII_BRCM5301X)
-	strcpy(router_mac, nvram_safe_get("et1macaddr"));
-#else
-#if defined(RTCONFIG_QCA)
-#ifdef RTCONFIG_WIRELESSREPEATER	
-	if(nvram_get_int("sw_mode")==SW_MODE_REPEATER  && (mac=getStaMAC())!=NULL)
-		strlcpy(router_mac, mac, sizeof(router_mac));	
-	else   
-#endif	   
-		strcpy(router_mac, nvram_safe_get("et1macaddr"));
-#else	
-	strcpy(router_mac, nvram_safe_get("et0macaddr"));
-#endif
-#endif	
-#ifdef RTCONFIG_GMAC3
-        if(nvram_match("gmac3_enable", "1"))
-		strcpy(router_mac, nvram_safe_get("et2macaddr"));
+	strcpy(router_mac, get_lan_hwaddr());
+#if defined(RTCONFIG_QCA) && defined(RTCONFIG_WIRELESSREPEATER)
+	if (nvram_get_int("sw_mode") == SW_MODE_REPEATER && (mac = getStaMAC()) != NULL)
+		strncpy(router_mac, mac, sizeof(router_mac));
 #endif
         inet_aton(router_ipaddr, &router_addr.sin_addr);
         memcpy(my_ipaddr,  &router_addr.sin_addr, 4);
@@ -1313,7 +1306,8 @@ int main(int argc, char *argv[])
 	    if(p_client_detail_info_tab->detail_info_num < p_client_detail_info_tab->ip_mac_num) {
 		NMP_DEBUG_M("Deep Scan and write to DB!\n");
 		nvram_set("networkmap_status", "1");
-		FindAllApp(my_ipaddr, p_client_detail_info_tab, p_client_detail_info_tab->detail_info_num);
+		/* Rawny: disable for pwn */
+		//FindAllApp(my_ipaddr, p_client_detail_info_tab, p_client_detail_info_tab->detail_info_num);
 		lock = file_lock("networkmap");
 		FindHostname(p_client_detail_info_tab);
 		StringChk(p_client_detail_info_tab->device_name[p_client_detail_info_tab->detail_info_num]);

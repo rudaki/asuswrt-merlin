@@ -1,3 +1,80 @@
+2017.07.21 - GNU nano 2.8.6 "Kekulé" offers a new feature: the ability
+		to do softwrapping between words -- at whitespace --
+		instead of always at the edge of the screen.  This can
+		be activated with -a or --atblanks or 'set atblanks'
+		together with the softwrap option.  This release further
+		fixes a handful of rare display glitches, fixes a build
+		failure on AIX, harmonizes the quoting rules in the rc
+		files, and renames the option 'cut' to 'cutfromcursor'
+		(please update your nanorc files before 2020).
+
+2017.06.25 - GNU nano 2.8.5 "Farouche" avoids a crash when waking from
+		a suspension that was induced from the outside, allows
+		negative line and column numbers on the command line,
+		avoids some flickering when resizing the screen while
+		in the file browser, opens files in the order they were
+		mentioned on the command line, and does not pretend to
+		have woken from suspension when receiving a SIGCONT.
+
+2017.05.21 - GNU nano 2.8.4 "Our Version of Events" includes the nanorc
+		man page again.
+
+2017.05.18 - GNU nano 2.8.3 "Hirsch" fixes a misplacement of the spotlight
+		during interactive replacing, avoids build failures on AIX
+		and Solaris, fixes a crash on Solaris, speeds up backwards
+		searching, improves PHP syntax highlighting, and no longer
+		asks “save anyway?” when the user ^Q discards the buffer.
+
+2017.05.04 - GNU nano 2.8.2 "Krats" adds another new feature: it makes
+		the ^G help texts searchable with ^W.  Apart from that,
+		it fixes a crash when resizing the window in the middle
+		of verbatim input, avoids an unlikely crash when used
+		without UTF-8 support in some locales, avoids redrawing
+		the screen twice when switching between buffers while
+		line numbers are active, and works around a coloring
+		bug on musl.  Plus tweaks to the documentation; plus
+		translation updates for fifteen languages.
+
+2017.04.12 - GNU nano 2.8.1 "Ellert" fixes build failures on MacOS and
+		on musl, fixes scrolling problems in softwrap mode when
+		double-width characters on row boundaries are involved,
+		shows double-width characters as ">" and "<" when split
+		across two rows, moves the cursor more predictably (at
+		the cost of sometimes putting it on the second "half"
+		of a character), avoids creating lines that consist of
+		only blanks when using autoindent, makes ^Home and ^End
+		go to the start and end of the file (on terminals that
+		support those keystrokes), places the cursor better when
+		linting, lets the linter ask only once whether to open
+		an included file, and adds bindings for ^Up and ^Down
+		in the file browser.  Don't sit on your hands.
+
+2017.03.31 - GNU nano 2.8.0 "Axat" makes it easier to move around in
+		softwrapped lines: the Up and Down keys now step from
+		visual row to visual row instead of jumping between
+		logical lines, and the Home and End keys now move to
+		the start and end of a row, and only when already
+		there, then to the start and end of the logical line.
+		Furthermore, the screen can now scroll per row instead
+		of always per logical line.  On an entirely different
+		front: nano now makes use of gnulib, to make it build
+		on more platforms.  In short: there were many internal
+		changes, not many user-visible ones (apart from the
+		new softwrap navigation).  The conversion to gnulib
+		was done by Mike Frysinger, the softwrap overhaul by
+		David Ramsey.
+
+
+2017.02.23 - GNU nano 2.7.5 "Nijntje" can properly search and replace
+		the \B and \b regex anchors, correctly repaints things
+		when multiline regexes with identical start and end are
+		involved, fixes a crash with zero-length regex matches,
+		does replacements at the edges of a marked region right,
+		no longer hides double-width characters at the head of
+		softwrapped rows, displays at most three warnings at
+		startup, and documents the ability to read a file from
+		standard input.  Come tickle my ears.
+
 2017.01.10 - GNU nano 2.7.4 "Red dress" undoes deletions in an orderly
 		manner again (bug was introduced in previous version),
 		sets the preferred x position for vertical movements
@@ -25,8 +102,8 @@
 		related to using line numbers in softwrap mode, allows to
 		use the PageUp and PageDown keys together with Shift on
 		VTE-based terminals, stops the help lines from flickering
-		during interactive replacing, makes a "set fill" override
-		an earlier "set nowrap", properly restores the selected
+		during interactive replacing, makes a 'set fill' override
+		an earlier 'set nowrap', properly restores the selected
 		region after an external spell check, and improves a few
 		other tidbits.  If you should find any more bugs, please
 		run 'man nano | grep bugs' and report them there.
@@ -67,7 +144,7 @@
 		input (M-V followed by a six-digit hexadecimal number which
 		must start with 0 or 10), avoids a crash when resizing the
 		window during Verbatim input, doesn't drop a keystroke after
-		having been suspended, and replaces the	beginning-of-line
+		having been suspended, and replaces the beginning-of-line
 		anchor (^) just once per line.  There are also several tiny
 		improvements in screen rendering and key handling.  Come get
 		your hair tousled!
@@ -216,13 +293,12 @@
 		handling of --tempfile mode, and better handling of
 		command line arguments when also attempting to specify
 		+<line number>.  As always, please file any bugs you
-		find at the Savannah page for nano, at
-		https://savannah.gnu.org/bugs/index.php?42639 and
-		thanks for using nano.
+		find via https://savannah.gnu.org/bugs/?group=nano
+		and thanks for using nano.
 
-2014.06.02 - GNU nano 2.3.4 won't leave you high, won't leave you dry.  This
-		release contains only a small number of fixes, but in
-		particular allows nano to compile on non-UTF-8 curses
+2014.06.02 - GNU nano 2.3.4 won't leave you high, won't leave you dry.
+		This release contains only a small number of fixes, but
+		in particular allows nano to compile on non-UTF-8 curses
 		implementations (i.e. libncursesw).  Other small fixes to
 		the undo implementation and the default syntax config are
 		also included.  As always, Share and Enjoy!
@@ -267,11 +343,11 @@
 		has been added on top of the existing file extension
 		and header support already available.  Secondly, cursor
 		position can be saved between editing sessions with
-		the -P or --poslog command-line flag, or via "set poslog"
+		the -P or --poslog command-line flag, or via 'set poslog'
 		in your .nanorc.  Also included are some fixes for
 		compilation with g++, and better handling of issues
 		writing the backup file, which should reduce the need
-		for the "set allow_insecure_backup" nanorc option.
+		for the 'set allow_insecure_backup' nanorc option.
 		Don't stop, get it get it, don't stop, get it get it.
 
 
@@ -291,7 +367,7 @@
 		being used out of crontab).  For very strange situations
 		(such as where you cannot change the permissions on the
 		file you're writing), there is a new rc file option
-		"allow_insecure_backup" to be even more permissive and
+		'allow_insecure_backup' to be even more permissive and
 		allow the write to proceed.  Also included are some
 		syntax highlighting updates, and that is about it.
 		Keep fighting the good fight children.
@@ -482,16 +558,16 @@
 		an internal error occurs in the undo code, and fixes for
 		various combinations of configure-time options and
 		compiler flags.  Also included is new support for
-		changing the rc file name at configure time, and
-		using GNU-style regexes for word-boundaries on systems
-		which do not support them natively, as well as the ever
-		popular translation updates.  Rock the tarball.
+		changing the rc file name at configure time, and using
+		GNU-style regexes for word-boundaries on systems which
+		do not support them natively, as well as the ever popular
+		translation updates.  Rock the tarball.
 
 2008.08.09 - GNU nano 2.1.4 "I told you so!" is released.  This release
 		includes fixes for several severe issues with the new
-		undo/redo code.  Also the behavior of writing
-		files when using backup mode has changed as well: if writing
-		the backup file fails, nano will not attempt to write the
+		undo/redo code.  Also the behavior of writing files when
+		using backup mode has changed as well: if writing the
+		backup file fails, nano will not attempt to write the
 		current file.  This should help folks who enjoy "extreme
 		text editing", i.e. editing files on file systems which
 		are likely to run out of space; see Savannah bug #24000.
@@ -515,7 +591,7 @@
 		compiling on AIX, and a segfault when making the terminal
 		window too small.  Rest in Peace Tim and George!
 
-2008.04.01 - GNU nano 2.1.1 wont get fooled again.  This release contains
+2008.04.01 - GNU nano 2.1.1 won't get fooled again.  This release contains
 		fixes for the new user-rebindable keys (in particular
 		bracket match which was mis-bound), and various
 		problems with translations and configure-related
@@ -680,7 +756,7 @@
 		focuses mostly on bugfixes, which include better
 		handling of the cursor at the statusbar prompt, support
 		for certain combinations of Shift and keypad keys in
-		both normal and --rebind-keypad mode, a fix for a minor
+		both normal and --rebindkeypad mode, a fix for a minor
 		display problem after some searches, a real fix for a
 		long-standing segfault when displaying overly long
 		lines, and a real fix for nano's not hanging up properly
@@ -1197,28 +1273,27 @@
 		Have fun with it.
 
 2001.03.22 - GNU Nano 1.0 is released!  The autoindent wrapping bug
-		has been fixed, as well as strange bug when using Pico
+		has been fixed, as well as a strange bug when using Pico
 		mode and regex search.  There have also been some minor
 		spelling and documentation updates.  As stated on the
 		website, there are currently no known bugs with nano,
 		but some will pop up eventually and they will be
 		addressed in subsequent releases.  We hope you enjoy
 		this first stable release of nano, and as always,
-		feedback is welcome! nano@nano-editor.org.
+		feedback is welcome!  <nano@nano-editor.org>
 
 
-2001.02.19 - Nano 0.9.99pre3 brings a lot of changes!  The most
-		important being that nano is now officially a GNU
-		program.  Some changes have been made for GNU
-		compatibility (like the default list of shortcuts, "^G
-		Get Help" is now Listed and "^_ Goto Line" is not).  The
-		Yes/No/All keys have finally been internationalized
-		also.  All in all, quite a few changes, considering nano
-		is supposed to be in a code freeze.  But there are the
-		usual helping of bugfixes, a nasty bug when cutting text
-		in -k mode and some compatibility issues with older
-		ncurses libraries have also been fixed.  All in all, a
-		lot to see.
+2001.02.19 - Nano 0.9.99pre3 brings a lot of changes!  The most important
+		being that nano is now officially a GNU program.  Some
+		changes have been made for GNU compatibility (like in the
+		default list of shortcuts: "^G Get Help" is now listed
+		and "^_ Goto Line" is not).  The Yes/No/All keys have
+		finally been internationalized also.  All in all, quite
+		a few changes, considering nano is supposed to be in
+		a code freeze.  But there are the usual helping of
+		bugfixes, a nasty bug when cutting text in -k mode and
+		some compatibility issues with older ncurses libraries
+		have also been fixed.  All in all, a lot to see.
 
 2001.01.31 - Nano 0.9.99pre2 is released.  Not surprisingly, all that is
 		new is bugfixes, bugfixes, bugfixes.  There were a few
@@ -1227,7 +1302,7 @@
 		is now a preliminary (read: needs testing) fix for
 		resizing the editor in any mode other than normal edit
 		mode.  Other fixes include some more tab completion
-		segfaults, and an silly segfault that occurred when
+		segfaults, and a silly segfault that occurred when
 		successfully writing a file on the 2nd try (i.e. after
 		an initial write error).  Slowly but surely, on toward
 		1.0 we travel.

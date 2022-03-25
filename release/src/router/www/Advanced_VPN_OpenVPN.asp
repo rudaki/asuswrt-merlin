@@ -145,6 +145,11 @@ function initial(){
 	show_menu();		
 	addOnlineHelp(document.getElementById("faq"), ["ASUSWRT", "VPN"]);
 
+	//if support pptpd and openvpnd then show switch button
+	if(pptpd_support && openvpnd_support) {
+		document.getElementById("divSwitchMenu").style.display = "";
+	}
+
 	formShowAndHide(vpn_server_enable, "openvpn");
 
 	/*Advanced Setting start */
@@ -171,13 +176,77 @@ function initial(){
 
 	updateCRTValue();
 	update_visibility();
-
+	update_cipher();
 	/*Advanced Setting end */
 
 	//check DUT is belong to private IP.
 	setTimeout("show_warning_message();", 100);
+
+	//set FAQ URL
+	set_FAQ("faq_windows", "1004469");
+	set_FAQ("faq_macOS", "1004472");
+	set_FAQ("faq_iPhone", "1004471");
+	set_FAQ("faq_android", "1004466");
 }
 
+function set_FAQ(_objID, _faqNum) {
+	var faqLang = {
+		EN : "/",
+		TW : "/",
+		CN : "/",
+		CZ : "/",
+		PL : "/",
+		RU : "/",
+		DE : "/",
+		FR : "/",
+		TR : "/",
+		TH : "/",
+		MS : "/",
+		NO : "/",
+		FI : "/",
+		DA : "/",
+		SV : "/",
+		BR : "/",
+		PT : "/",
+		JP : "/",
+		ES : "/",
+		IT : "/",
+		UK : "/",
+		HU : "/",
+		RO : "/",
+		KR : "/",
+		SL : "/",
+		NL : "/"
+	};
+
+	faqLang.TW = "/TW/";
+	faqLang.CN = "/CN/";
+	faqLang.CZ = "/CZ/";
+	faqLang.PL = "/PL/";
+	faqLang.RU = "/RU/";
+	faqLang.DE = "/DE/";
+	faqLang.FR = "/FR/";
+	faqLang.TR = "/TR/";
+	faqLang.TH = "/TH/";
+	faqLang.PT = "/PT/";
+	faqLang.KR = "/KR/";
+	faqLang.ES = "/ES/";
+	faqLang.IT = "/IT/";
+	faqLang.UK = "/UK/";
+	faqLang.HU = "/HU/";
+	faqLang.RO = "/RO/";
+
+	var preferredLang = "";
+	preferredLang = faqLang.<% nvram_get("preferred_lang"); %>;
+	if(preferredLang == undefined)
+		preferredLang = "/";
+
+	var faqURL = "";
+	faqURL = "https://www.asus.com" + preferredLang;
+	faqURL += "support/FAQ/";
+	faqURL += _faqNum;
+	$("#" + _objID + "").attr("href", faqURL);
+}
 var MAX_RETRY_NUM = 5;
 var external_ip_retry_cnt = MAX_RETRY_NUM;
 function show_warning_message(){
@@ -190,19 +259,19 @@ function show_warning_message(){
 		}
 		else if(realip_state != "2"){
 			if(validator.isPrivateIP(wanlink_ipaddr())){
-				document.getElementById("privateIP_notes").innerHTML = "<#vpn_privateIP_hint#>"
+				document.getElementById("privateIP_notes").innerHTML = "<#vpn_privateIP_hint#>";
 				document.getElementById("privateIP_notes").style.display = "";
 			}
 		}
 		else{
 			if(!external_ip){
-				document.getElementById("privateIP_notes").innerHTML = "<#vpn_privateIP_hint#>"
+				document.getElementById("privateIP_notes").innerHTML = "<#vpn_privateIP_hint#>";
 				document.getElementById("privateIP_notes").style.display = "";
 			}
 		}
 	}
 	else if(validator.isPrivateIP(wanlink_ipaddr())){
-		document.getElementById("privateIP_notes").innerHTML = "<#vpn_privateIP_hint#>"
+		document.getElementById("privateIP_notes").innerHTML = "<#vpn_privateIP_hint#>";
 		document.getElementById("privateIP_notes").style.display = "";
 	}
 }
@@ -283,7 +352,7 @@ function applyRule(){
 		if(!validator.numberRange(document.form.vpn_server_port, 1, 65535)) {
 			return false;
 		}
-		if(!validator.numberRange(document.form.vpn_server_poll, 0, 1440)) {
+		if(!validator.numberRange(document.form.vpn_server_poll, 0, 60)) {
 			return false;
 		}
 		if(!validator.numberRange(document.form.vpn_server_reneg, -1, 2147483647)) {
@@ -601,7 +670,7 @@ function addRow_Group(upper){
 	var password_obj = document.form.vpn_server_clientlist_password;
 	var rule_num = document.getElementById("openvpnd_clientlist_table").rows.length;
 	var item_num = document.getElementById("openvpnd_clientlist_table").rows[0].cells.length;		
-	if(rule_num >= upper + 1) {
+	if(rule_num >= upper) {
 		alert("<#JS_itemlimit1#> " + upper + " <#JS_itemlimit2#>");
 		return false;	
 	}
@@ -1105,6 +1174,14 @@ function defaultSettings() {
 	}
 }
 
+
+function update_cipher() {
+	$("#cipher_hint").css("display", "none");
+	var cipher = document.form.vpn_server_cipher.value;
+	if(cipher == "default")
+		$("#cipher_hint").css("display", "");
+}
+
 </script>
 </head>
 <body onload="initial();">
@@ -1177,7 +1254,7 @@ function defaultSettings() {
 									</td>
 								</tr>
 								<tr id="edit_tls4">
-									<th><#vpn_openvpn_KC_DH#></th>
+									<th><#vpn_openvpn_KC_DH#><br>(enter "none" to disable)</th>
 									<td>
 										<textarea rows="8" class="textarea_ssh_table" id="edit_vpn_crt_server_dh" name="edit_vpn_crt_server_dh" cols="65" maxlength="3999"></textarea>
 									</td>
@@ -1246,6 +1323,16 @@ function defaultSettings() {
 								<td bgcolor="#4D595D" valign="top">
 									<div>&nbsp;</div>
 									<div class="formfonttitle"><#BOP_isp_heart_item#> - OpenVPN</div>
+									<div id="divSwitchMenu" style="margin-top:-40px;float:right;display:none;">	
+										<div style="width:173px;height:30px;border-top-left-radius:8px;border-bottom-left-radius:8px;" class="block_filter">
+											<a href="Advanced_VPN_PPTP.asp">
+												<div class="block_filter_name">PPTP</div>
+											</a>
+										</div>
+										<div style="width:172px;height:30px;margin:-32px 0px 0px 173px;border-top-right-radius:8px;border-bottom-right-radius:8px;" class="block_filter_pressed">
+											<div style="text-align:center;padding-top:5px;color:#93A9B1;font-size:14px">OpenVPN</div>
+										</div>
+									</div>
 									<div style="margin-left:5px;margin-top:10px;margin-bottom:10px"><img src="/images/New_ui/export/line_export.png"></div>
 									<div id="privateIP_notes" class="formfontdesc" style="display:none;color:#FFCC00;"></div>
 									<table width="100%" border="1" align="center" cellpadding="4" cellspacing="0" bordercolor="#6b8fa3" class="FormTable">
@@ -1319,13 +1406,12 @@ function defaultSettings() {
 									</table>
 									<div id="OpenVPN_setting" style="display:none;margin-top:8px;">
 										<div class="formfontdesc">
-											<#vpn_openvpn_desc1#>&nbsp;<#vpn_openvpn_desc3#>&nbsp;<#vpn_openvpn_desc2#> <#menu5#>
-											<br />
+											<#vpn_openvpn_desc1#>&nbsp;<#vpn_openvpn_desc3#>&nbsp;<#vpn_openvpn_desc2#><br>
 											<ol>
-												<li><a href="http://www.asus.com/support/Knowledge-Detail/11/2/RTAC68U/1A935B95-C237-4281-AE86-C824737D11F9/" target="_blank" style="text-decoration:underline;">Windows</a>
-												<li><a href="http://www.asus.com/support/Knowledge-Detail/11/2/RTAC68U/C77ADCBF-F5C4-46B4-8A0D-B64F09AB881F/" target="_blank" style="text-decoration:underline;">Mac OS</a>
-												<li><a href="http://www.asus.com/support/Knowledge-Detail/11/2/RTAC68U/37EC8F08-3F50-4F82-807E-6D2DCFE5146A/" target="_blank" style="text-decoration:underline;">iPhone/iPad</a>
-												<li><a href="http://www.asus.com/support/Knowledge-Detail/11/2/RTAC68U/8DCA7DA6-E5A0-40C2-8AED-B9361E89C844/" target="_blank" style="text-decoration:underline;">Android</a>
+												<li><a id="faq_windows" href="https://www.asus.com/support/FAQ/1004469/" target="_blank" style="text-decoration:underline;">Windows</a>
+												<li><a id="faq_macOS" href="https://www.asus.com/support/FAQ/1004472/" target="_blank" style="text-decoration:underline;">Mac OS</a>
+												<li><a id="faq_iPhone" href="https://www.asus.com/support/FAQ/1004471/" target="_blank" style="text-decoration:underline;">iPhone/iPad</a>
+												<li><a id="faq_android" href="https://www.asus.com/support/FAQ/1004466/" target="_blank" style="text-decoration:underline;">Android</a>
 											<ol>
 										</div>
 
@@ -1400,7 +1486,6 @@ function defaultSettings() {
 															}
 														);
 													</script>
-													<span>Warning: any unsaved change will be lost.</span>
 												</td>
 											</tr>
 											<tr>
@@ -1566,7 +1651,8 @@ function defaultSettings() {
 											<tr id="server_cipher">
 												<th>Legacy/fallback cipher</th>
 												<td>
-													<select name="vpn_server_cipher" class="input_option"></select>
+													<select name="vpn_server_cipher" class="input_option" onChange="update_cipher();"></select>
+													<span id="cipher_hint" style="color:#FC0">(Default : BF-CBC)</span>
 												</td>
 											</tr>
 											<tr>
@@ -1590,9 +1676,9 @@ function defaultSettings() {
 												</td>
 											</tr>
 											<tr>
-												<th>Global Log verbosity</th>
+												<th>Log verbosity</th>
 												<td>
-													<input type="text" maxlength="2" class="input_6_table"name="vpn_loglevel" onKeyPress="return validator.isNumber(this,event);"onblur="validate_number_range(this, 0, 11)" value="<% nvram_get("vpn_loglevel"); %>">
+													<input type="text" maxlength="2" class="input_6_table"name="vpn_server_verb" onKeyPress="return validator.isNumber(this,event);"onblur="validate_number_range(this, 0, 11)" value="<% nvram_get("vpn_server_verb"); %>">
 													<span style="color:#FC0">(Between 0 and 11. Default: 3)</span>
 												</td>
 											</tr>
@@ -1668,7 +1754,7 @@ function defaultSettings() {
 
 											<tr>
 												<td>
-													<textarea rows="8" class="textarea_ssh_table" name="vpn_server_custom" cols="55" maxlength="15000"><% nvram_clean_get("vpn_server_custom"); %></textarea>
+													<textarea rows="8" class="textarea_ssh_table" style="width:99%;" name="vpn_server_custom" cols="55" maxlength="15000"><% nvram_clean_get("vpn_server_custom"); %></textarea>
 												</td>
 											</tr>
 										</table>

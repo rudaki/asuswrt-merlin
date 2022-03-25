@@ -2829,7 +2829,10 @@ router_choose_random_node(smartlist_t *excludedsmartlist,
       });
   }
 
-  if ((r = routerlist_find_my_routerinfo()))
+  /* If the node_t is not found we won't be to exclude ourself but we
+   * won't be able to pick ourself in router_choose_random_node() so
+   * this is fine to at least try with our routerinfo_t object. */
+  if ((r = router_get_my_routerinfo()))
     routerlist_add_node_and_family(excludednodes, r);
 
   router_add_running_nodes_to_smartlist(sl, allow_invalid,
@@ -5445,7 +5448,7 @@ router_differences_are_cosmetic(const routerinfo_t *r1, const routerinfo_t *r2)
       (r1->contact_info && r2->contact_info &&
        strcasecmp(r1->contact_info, r2->contact_info)) ||
       r1->is_hibernating != r2->is_hibernating ||
-      cmp_addr_policies(r1->exit_policy, r2->exit_policy) ||
+      ! addr_policies_eq(r1->exit_policy, r2->exit_policy) ||
       (r1->supports_tunnelled_dir_requests !=
        r2->supports_tunnelled_dir_requests))
     return 0;

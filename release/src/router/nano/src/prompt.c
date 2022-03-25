@@ -1,8 +1,7 @@
 /**************************************************************************
  *   prompt.c  --  This file is part of GNU nano.                         *
  *                                                                        *
- *   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,  *
- *   2008, 2009, 2010, 2011, 2013, 2014 Free Software Foundation, Inc.    *
+ *   Copyright (C) 1999-2011, 2013-2017 Free Software Foundation, Inc.    *
  *   Copyright (C) 2016 Benno Schulenberg                                 *
  *                                                                        *
  *   GNU nano is free software: you can redistribute it and/or modify     *
@@ -58,7 +57,7 @@ int do_statusbar_input(bool *ran_func, bool *finished)
 	return KEY_WINCH;
 #endif
 
-#ifndef DISABLE_MOUSE
+#ifdef ENABLE_MOUSE
     /* If we got a mouse click and it was on a shortcut, read in the
      * shortcut character. */
     if (input == KEY_MOUSE) {
@@ -96,7 +95,7 @@ int do_statusbar_input(bool *ran_func, bool *finished)
 	    kbinput = (int *)nrealloc(kbinput, kbinput_len * sizeof(int));
 	    kbinput[kbinput_len - 1] = input;
 	}
-     }
+    }
 
     /* If we got a shortcut, or if there aren't any other keystrokes waiting
      * after the one we read in, we need to insert all the characters in the
@@ -125,9 +124,9 @@ int do_statusbar_input(bool *ran_func, bool *finished)
 	else if (s->scfunc == do_next_word_void)
 	    do_statusbar_next_word();
 #endif
-	else if (s->scfunc == do_home)
+	else if (s->scfunc == do_home_void)
 	    do_statusbar_home();
-	else if (s->scfunc == do_end)
+	else if (s->scfunc == do_end_void)
 	    do_statusbar_end();
 	/* When in restricted mode at the "Write File" prompt and the
 	 * filename isn't blank, disallow any input and deletion. */
@@ -138,9 +137,9 @@ int do_statusbar_input(bool *ran_func, bool *finished)
 				s->scfunc == do_delete ||
 				s->scfunc == do_backspace))
 	    ;
-	else if (s->scfunc == do_verbatim_input) {
+	else if (s->scfunc == do_verbatim_input)
 	    do_statusbar_verbatim_input();
-	} else if (s->scfunc == do_cut_text_void)
+	else if (s->scfunc == do_cut_text_void)
 	    do_statusbar_cut_text();
 	else if (s->scfunc == do_delete)
 	    do_statusbar_delete();
@@ -165,7 +164,7 @@ int do_statusbar_input(bool *ran_func, bool *finished)
     return input;
 }
 
-#ifndef DISABLE_MOUSE
+#ifdef ENABLE_MOUSE
 /* Handle a mouse click on the statusbar prompt or the shortcut list. */
 int do_statusbar_mouse(void)
 {
@@ -197,7 +196,7 @@ void do_statusbar_output(int *the_input, size_t input_len,
 	bool filtering)
 {
     char *output = charalloc(input_len + 1);
-    char *char_buf = charalloc(mb_cur_max());
+    char onechar[MAXCHARLEN];
     int i, char_len;
 
     /* Copy the typed stuff so it can be treated. */
@@ -213,7 +212,7 @@ void do_statusbar_output(int *the_input, size_t input_len,
 	    output[i] = '\n';
 
 	/* Interpret the next multibyte character. */
-	char_len = parse_mbchar(output + i, char_buf, NULL);
+	char_len = parse_mbchar(output + i, onechar, NULL);
 
 	i += char_len;
 
@@ -225,12 +224,11 @@ void do_statusbar_output(int *the_input, size_t input_len,
 	answer = charealloc(answer, strlen(answer) + char_len + 1);
 	charmove(answer + statusbar_x + char_len, answer + statusbar_x,
 				strlen(answer) - statusbar_x + 1);
-	strncpy(answer + statusbar_x, char_buf, char_len);
+	strncpy(answer + statusbar_x, onechar, char_len);
 
 	statusbar_x += char_len;
     }
 
-    free(char_buf);
     free(output);
 
     update_the_statusbar();
@@ -293,10 +291,10 @@ void do_statusbar_delete(void)
 /* Zap some or all text from the answer. */
 void do_statusbar_cut_text(void)
 {
-    if (!ISSET(CUT_TO_END))
+    if (!ISSET(CUT_FROM_CURSOR))
 	statusbar_x = 0;
 
-    null_at(&answer, statusbar_x);
+    answer[statusbar_x] = '\0';
 
     update_the_statusbar();
 }
@@ -385,35 +383,18 @@ void reinit_statusbar_x(void)
     statusbar_x = HIGHEST_POSITIVE;
 }
 
-/* Put the cursor in the answer at statusbar_x. */
-void reset_statusbar_cursor(void)
-{
-    size_t start_col = strlenpt(prompt) + 2;
-    size_t xpt = statusbar_xplustabs();
-
-    /* Work around a cursor-misplacement bug in VTEs. */
-    wmove(bottomwin, 0, 0);
-    wnoutrefresh(bottomwin);
-    doupdate();
-
-    wmove(bottomwin, 0, start_col + xpt -
-			get_statusbar_page_start(start_col, start_col + xpt));
-
-    wnoutrefresh(bottomwin);
-}
-
-/* Repaint the statusbar. */
+/* Redraw the promptbar and place the cursor at the right spot. */
 void update_the_statusbar(void)
 {
-    size_t base, the_page, end_page;
+    size_t base = strlenpt(prompt) + 2;
+    size_t the_page, end_page, column;
     char *expanded;
 
-    base = strlenpt(prompt) + 2;
     the_page = get_statusbar_page_start(base, base + strnlenpt(answer, statusbar_x));
     end_page = get_statusbar_page_start(base, base + strlenpt(answer) - 1);
 
+    /* Color the promptbar over its full width. */
     wattron(bottomwin, interface_color_pair[TITLE_BAR]);
-
     blank_statusbar();
 
     mvwaddstr(bottomwin, 0, 0, prompt);
@@ -428,7 +409,14 @@ void update_the_statusbar(void)
 
     wattroff(bottomwin, interface_color_pair[TITLE_BAR]);
 
-    reset_statusbar_cursor();
+    /* Work around a cursor-misplacement bug in VTEs. */
+    wmove(bottomwin, 0, 0);
+    wrefresh(bottomwin);
+
+    /* Place the cursor at statusbar_x in the answer. */
+    column = base + statusbar_xplustabs();
+    wmove(bottomwin, 0, column - get_statusbar_page_start(base, column));
+    wnoutrefresh(bottomwin);
 }
 
 /* Get a string of input at the statusbar prompt. */
@@ -442,7 +430,7 @@ functionptrtype acquire_an_answer(int *actual, bool allow_tabs,
     int kbinput = ERR;
     bool ran_func, finished;
     functionptrtype func;
-#ifndef DISABLE_TABCOMP
+#ifdef ENABLE_TABCOMP
     bool tabbed = FALSE;
 	/* Whether we've pressed Tab. */
 #endif
@@ -452,7 +440,7 @@ functionptrtype acquire_an_answer(int *actual, bool allow_tabs,
     char *magichistory = NULL;
 	/* The temporary string typed at the bottom of the history, if
 	 * any. */
-#ifndef DISABLE_TABCOMP
+#ifdef ENABLE_TABCOMP
     int last_kbinput = ERR;
 	/* The key we pressed before the current key. */
     size_t complete_len = 0;
@@ -469,10 +457,6 @@ functionptrtype acquire_an_answer(int *actual, bool allow_tabs,
 #endif
 
     update_the_statusbar();
-
-    /* Refresh edit window and statusbar before getting input. */
-    wnoutrefresh(edit);
-    wnoutrefresh(bottomwin);
 
     while (TRUE) {
 	/* Ensure the cursor is shown when waiting for input. */
@@ -497,7 +481,7 @@ functionptrtype acquire_an_answer(int *actual, bool allow_tabs,
 	if (func == do_cancel || func == do_enter)
 	    break;
 
-#ifndef DISABLE_TABCOMP
+#ifdef ENABLE_TABCOMP
 	if (func != do_tab)
 	    tabbed = FALSE;
 
@@ -518,7 +502,7 @@ functionptrtype acquire_an_answer(int *actual, bool allow_tabs,
 		answer = input_tab(answer, allow_files, &statusbar_x,
 					&tabbed, refresh_func, listed);
 	} else
-#endif /* !DISABLE_TABCOMP */
+#endif /* ENABLE_TABCOMP */
 #ifndef DISABLE_HISTORIES
 	if (func == get_history_older_void) {
 	    if (history_list != NULL) {
@@ -582,7 +566,7 @@ functionptrtype acquire_an_answer(int *actual, bool allow_tabs,
 
 	update_the_statusbar();
 
-#if !defined(DISABLE_HISTORIES) && !defined(DISABLE_TABCOMP)
+#if !defined(DISABLE_HISTORIES) && defined(ENABLE_TABCOMP)
 	last_kbinput = kbinput;
 #endif
     }
@@ -622,8 +606,9 @@ int do_prompt(bool allow_tabs, bool allow_files,
     int retval;
     functionptrtype func = NULL;
     bool listed = FALSE;
-    /* Save a possible current statusbar x position. */
+    /* Save a possible current statusbar x position and prompt. */
     size_t was_statusbar_x = statusbar_x;
+    char *saved_prompt = prompt;
 
     bottombars(menu);
 
@@ -632,12 +617,12 @@ int do_prompt(bool allow_tabs, bool allow_files,
 #ifndef NANO_TINY
   redo_theprompt:
 #endif
-    prompt = charalloc((COLS * mb_cur_max()) + 1);
+    prompt = charalloc((COLS * MAXCHARLEN) + 1);
     va_start(ap, msg);
-    vsnprintf(prompt, COLS * mb_cur_max(), msg, ap);
+    vsnprintf(prompt, COLS * MAXCHARLEN, msg, ap);
     va_end(ap);
     /* Reserve five columns for colon plus angles plus answer, ":<aa>". */
-    null_at(&prompt, actual_x(prompt, (COLS < 5) ? 0 : COLS - 5));
+    prompt[actual_x(prompt, (COLS < 5) ? 0 : COLS - 5)] = '\0';
 
     func = acquire_an_answer(&retval, allow_tabs, allow_files, &listed,
 #ifndef DISABLE_HISTORIES
@@ -646,7 +631,7 @@ int do_prompt(bool allow_tabs, bool allow_files,
 			refresh_func);
 
     free(prompt);
-    prompt = NULL;
+    prompt = saved_prompt;
 
 #ifndef NANO_TINY
     if (retval == KEY_WINCH)
@@ -672,7 +657,7 @@ int do_prompt(bool allow_tabs, bool allow_files,
     fprintf(stderr, "answer = \"%s\"\n", answer);
 #endif
 
-#ifndef DISABLE_TABCOMP
+#ifdef ENABLE_TABCOMP
     /* If we've done tab completion, there might still be a list of
      * filename matches on the edit window.  Clear them off. */
     if (listed)
@@ -753,7 +738,7 @@ int do_yesno_prompt(bool all, const char *msg)
 
 	if (func == do_cancel)
 	    response = -1;
-#ifndef DISABLE_MOUSE
+#ifdef ENABLE_MOUSE
 	else if (kbinput == KEY_MOUSE) {
 	    int mouse_x, mouse_y;
 	    /* We can click on the Yes/No/All shortcuts to select an answer. */
@@ -775,7 +760,7 @@ int do_yesno_prompt(bool all, const char *msg)
 		    response = -2;
 	    }
 	}
-#endif /* !DISABLE_MOUSE */
+#endif /* ENABLE_MOUSE */
 	else {
 	    /* Look for the kbinput in the Yes, No (and All) strings. */
 	    if (strchr(yesstr, kbinput) != NULL)

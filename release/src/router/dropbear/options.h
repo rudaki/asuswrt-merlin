@@ -131,7 +131,7 @@ If you test it please contact the Dropbear author */
  * If you disable MD5, Dropbear will fall back to SHA1 fingerprints,
  * which are not the standard form. */
 #define DROPBEAR_SHA1_HMAC
-#define DROPBEAR_SHA1_96_HMAC
+/*#define DROPBEAR_SHA1_96_HMAC */
 #define DROPBEAR_SHA2_256_HMAC
 #define DROPBEAR_SHA2_512_HMAC
 /* #define DROPBEAR_MD5_HMAC */
@@ -281,7 +281,7 @@ Homedir is prepended unless path begins with / */
 
 /* Maximum number of failed authentication tries (server option) */
 #ifndef MAX_AUTH_TRIES
-#define MAX_AUTH_TRIES 10
+#define MAX_AUTH_TRIES 3
 #endif
 
 /* The default file to store the daemon's process ID, for shutdown
